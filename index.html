@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PMO Intelligence Workspace</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080c14;--bg2:#0d1220;--bg3:#111827;--bg4:#1a2236;--bg5:#1f2a40;
+  --border:#1e2d45;--border2:#2a3f60;--border3:#354d75;
+  --text:#e2e8f7;--text2:#8b9bbf;--text3:#4a5a7a;--text4:#2d3a52;
+  --accent:#3b82f6;--accent2:#2563eb;--accent3:#1d4ed8;--accent-soft:rgba(59,130,246,0.08);--accent-mid:rgba(59,130,246,0.15);
+  --green:#10b981;--green-soft:rgba(16,185,129,0.08);--green-mid:rgba(16,185,129,0.15);
+  --red:#ef4444;--red-soft:rgba(239,68,68,0.08);--red-mid:rgba(239,68,68,0.15);
+  --amber:#f59e0b;--amber-soft:rgba(245,158,11,0.08);--amber-mid:rgba(245,158,11,0.15);
+  --purple:#8b5cf6;--purple-soft:rgba(139,92,246,0.08);--purple-mid:rgba(139,92,246,0.15);
+  --teal:#06b6d4;--teal-soft:rgba(6,182,212,0.08);--teal-mid:rgba(6,182,212,0.15);
+  --pink:#ec4899;--pink-soft:rgba(236,72,153,0.08);
+  --r:8px;--rl:12px;--rxl:16px;--rxxl:20px;
+  --shadow:0 4px 24px rgba(0,0,0,0.4);--shadow-lg:0 8px 48px rgba(0,0,0,0.6);
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'Fira Code','SF Mono',monospace;
+  --sidebar:220px;
+}
+
+/* LAYOUT */
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;font-size:14px;line-height:1.5}
+#app{display:flex;width:100%;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+#sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.logo-mark{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-family:var(--font-mono)}
+.logo-sub{font-size:10px;color:var(--text3);margin-top:2px;letter-spacing:0.5px}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:8px 0}
+.sidebar-scroll::-webkit-scrollbar{width:3px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.nav-section{margin-bottom:4px}
+.nav-section-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text4);padding:12px 16px 4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 12px 7px 16px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text3);border-left:2px solid transparent;transition:all 0.15s;position:relative;margin:1px 0}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent)}
+.nav-item svg{width:14px;height:14px;flex-shrink:0;opacity:0.8}
+.nav-item.active svg{opacity:1}
+.nav-badge{margin-left:auto;font-size:9px;font-weight:700;padding:2px 5px;border-radius:10px;min-width:16px;text-align:center;background:var(--red);color:#fff}
+.nav-badge.amber{background:var(--amber)}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0}
+.offline-pill{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text3)}
+.offline-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 6px var(--green)}
+.kb-hint{font-size:9px;color:var(--text4);margin-top:6px}
+kbd{background:var(--bg4);border:1px solid var(--border2);border-radius:3px;padding:1px 4px;font-family:var(--font-mono);font-size:9px;color:var(--text3)}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* TOPBAR */
+#topbar{height:50px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.topbar-page-title{font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap}
+.search-wrap{flex:1;max-width:380px;position:relative}
+.search-wrap input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:6px 12px 6px 32px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;transition:border 0.15s}
+.search-wrap input:focus{border-color:var(--border2);background:var(--bg4)}
+.search-wrap input::placeholder{color:var(--text3)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3)}
+.search-icon svg{width:12px;height:12px}
+#search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);box-shadow:var(--shadow-lg);z-index:500;max-height:320px;overflow-y:auto;display:none}
+.search-item{padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.search-item:last-child{border:none}
+.search-item:hover{background:var(--bg3)}
+.search-item-type{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:4px;flex-shrink:0}
+.search-item-title{font-size:12px;font-weight:500;color:var(--text)}
+.search-item-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.topbar-right{display:flex;gap:8px;align-items:center;margin-left:auto}
+.btn-topbar{padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:5px;transition:background 0.15s}
+.btn-topbar:hover{background:var(--accent2)}
+.btn-topbar.ghost{background:var(--bg4);color:var(--text2);border:1px solid var(--border2)}
+.btn-topbar.ghost:hover{background:var(--bg5);color:var(--text)}
+.btn-topbar svg{width:12px;height:12px}
+
+/* CONTENT */
+#content{flex:1;overflow-y:auto;padding:24px;background:var(--bg)}
+#content::-webkit-scrollbar{width:4px}
+#content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* TYPOGRAPHY */
+.page-title{font-size:20px;font-weight:700;letter-spacing:-0.4px;color:var(--text)}
+.page-sub{font-size:12px;color:var(--text3);margin-top:3px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.section-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px 20px}
+.card-hover{transition:border 0.15s,background 0.15s}
+.card-hover:hover{border-color:var(--border2);background:var(--bg3)}
+.card-sm{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.metric-grid{display:grid;gap:12px}
+.metric-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;cursor:pointer;transition:all 0.15s}
+.metric-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.metric-val{font-size:28px;font-weight:800;letter-spacing:-1px;font-family:var(--font-mono);line-height:1}
+.metric-label{font-size:11px;color:var(--text3);margin-top:5px;font-weight:500}
+.metric-sub{font-size:10px;margin-top:4px}
+
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+.g-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.g-auto-lg{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);display:inline-flex;align-items:center;gap:6px;transition:all 0.15s;white-space:nowrap}
+.btn svg{width:12px;height:12px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:hover{background:var(--bg4);color:var(--text)}
+.btn-danger{background:var(--red-soft);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+.btn-danger:hover{background:var(--red-mid)}
+.btn-success{background:var(--green-soft);color:var(--green);border:1px solid rgba(16,185,129,0.2)}
+.btn-success:hover{background:var(--green-mid)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-xs{padding:3px 7px;font-size:10px}
+.btn-icon{padding:6px;aspect-ratio:1;justify-content:center;border-radius:var(--r)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:0.3px;white-space:nowrap}
+.badge-blue{background:var(--accent-mid);color:var(--accent)}
+.badge-green{background:var(--green-mid);color:var(--green)}
+.badge-red{background:var(--red-mid);color:var(--red)}
+.badge-amber{background:var(--amber-mid);color:var(--amber)}
+.badge-purple{background:var(--purple-mid);color:var(--purple)}
+.badge-teal{background:var(--teal-mid);color:var(--teal)}
+.badge-gray{background:rgba(75,90,120,0.2);color:var(--text2)}
+.badge-pink{background:var(--pink-soft);color:var(--pink)}
+
+/* TABLE */
+.tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg3)}
+.tbl td{padding:11px 14px;font-size:12px;color:var(--text);border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:var(--bg3);cursor:pointer}
+.tbl td.muted{color:var(--text2)}
+.tbl td.danger{color:var(--red)}
+
+/* FORMS */
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px;letter-spacing:0.3px}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 11px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;transition:border 0.15s;line-height:1.5}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);background:var(--bg4)}
+.form-input::placeholder,.form-textarea::placeholder{color:var(--text3)}
+.form-select option{background:var(--bg3)}
+.form-textarea{resize:vertical;min-height:72px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-hint{font-size:10px;color:var(--text3);margin-top:4px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px)}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:580px;max-width:95vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-lg{width:740px}
+.modal-xl{width:900px}
+.modal-hdr{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);z-index:1}
+.modal-title{font-size:15px;font-weight:700;color:var(--text)}
+.modal-body{padding:22px}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:var(--bg2)}
+.close-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;display:flex;border-radius:var(--r);transition:all 0.1s}
+.close-btn:hover{color:var(--text);background:var(--bg4)}
+.close-btn svg{width:16px;height:16px}
+
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto}
+.tab{padding:9px 14px;font-size:12px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.15s}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+/* MISC */
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+.avatar{display:flex;align-items:center;justify-content:center;border-radius:50%;font-weight:700;flex-shrink:0;font-family:var(--font-mono)}
+.progress{height:5px;background:var(--bg5);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width 0.4s}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-green{background:var(--green)}
+.dot-red{background:var(--red)}
+.dot-amber{background:var(--amber)}
+.dot-blue{background:var(--accent)}
+.dot-purple{background:var(--purple)}
+.dot-gray{background:var(--text3)}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;background:var(--bg5);color:var(--text2);border:1px solid var(--border2);margin:2px}
+.note-block{border-radius:var(--r);padding:12px 14px;margin-bottom:10px;border-left:3px solid}
+.nb-discussion{background:rgba(59,130,246,0.05);border-color:var(--accent)}
+.nb-decision{background:rgba(16,185,129,0.05);border-color:var(--green)}
+.nb-risk{background:rgba(239,68,68,0.05);border-color:var(--red)}
+.nb-action{background:rgba(245,158,11,0.05);border-color:var(--amber)}
+.nb-blocker{background:rgba(139,92,246,0.05);border-color:var(--purple)}
+.nb-label{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.risk-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:8px;transition:border 0.15s}
+.risk-row:hover{border-color:var(--border2)}
+.health-bar{height:3px;border-radius:2px;margin-top:10px}
+.meeting-split{display:grid;grid-template-columns:1fr 320px;gap:20px}
+.action-item-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.action-item-row:last-child{border:none}
+.ai-checkbox{width:16px;height:16px;border:2px solid var(--border2);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;margin-top:1px}
+.ai-checkbox.checked{background:var(--green);border-color:var(--green)}
+.ai-checkbox svg{width:10px;height:10px;color:#fff}
+.person-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px;transition:all 0.15s}
+.person-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.stat-row{display:flex;padding:8px 0;border-bottom:1px solid var(--border);align-items:center}
+.stat-row:last-child{border:none}
+.stat-key{font-size:11px;color:var(--text3);width:130px;flex-shrink:0}
+.stat-val{font-size:12px;color:var(--text);font-weight:500}
+.empty-state{text-align:center;padding:48px 24px}
+.empty-icon{font-size:36px;margin-bottom:12px;opacity:0.4}
+.empty-label{font-size:13px;color:var(--text3);margin-bottom:16px}
+.insight-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:16px;border-left:3px solid}
+.quick-add-fab{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(59,130,246,0.45);transition:all 0.2s;z-index:200}
+.quick-add-fab:hover{transform:scale(1.08);background:var(--accent2)}
+
+/* TOAST */
+#toast-root{position:fixed;bottom:80px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:11px 16px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-lg);animation:slideIn 0.2s ease;border-left:3px solid}
+.toast-success{border-left-color:var(--green)}
+.toast-error{border-left-color:var(--red)}
+.toast-info{border-left-color:var(--accent)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+/* CHARTS (pure CSS) */
+.bar-chart{display:flex;align-items:flex-end;gap:6px;height:100px;padding-top:8px}
+.bar-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar-fill{width:100%;border-radius:3px 3px 0 0;transition:height 0.4s;min-height:2px}
+.bar-label{font-size:9px;color:var(--text3);text-align:center;white-space:nowrap}
+.bar-val{font-size:9px;font-weight:700;color:var(--text2)}
+.donut-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+.donut-center{position:absolute;text-align:center}
+.donut-num{font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--text)}
+.donut-lbl{font-size:9px;color:var(--text3)}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+.legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* TIMELINE */
+.timeline-item{display:flex;gap:12px;margin-bottom:16px}
+.timeline-line{display:flex;flex-direction:column;align-items:center}
+.timeline-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);background:var(--bg);flex-shrink:0;margin-top:3px}
+.timeline-connector{flex:1;width:1px;background:var(--border2);margin-top:4px}
+.timeline-content{flex:1;padding-bottom:4px}
+.timeline-date{font-size:10px;color:var(--text3);margin-bottom:3px}
+
+/* PRINT / REPORT */
+.report-section{margin-bottom:24px}
+.report-section-title{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp 0.22s ease}
+.stagger>*{animation:fadeUp 0.2s ease both}
+.stagger>*:nth-child(1){animation-delay:0ms}
+.stagger>*:nth-child(2){animation-delay:40ms}
+.stagger>*:nth-child(3){animation-delay:80ms}
+.stagger>*:nth-child(4){animation-delay:120ms}
+.stagger>*:nth-child(5){animation-delay:160ms}
+.stagger>*:nth-child(6){animation-delay:200ms}
+
+/* SCROLLBARS */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* RESPONSIVE */
+@media(max-width:1100px){.g4{grid-template-columns:1fr 1fr}.meeting-split{grid-template-columns:1fr}}
+@media(max-width:800px){.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">PMO·OS</div>
+    <div class="logo-sub">Intelligence Workspace</div>
+  </div>
+  <div class="sidebar-scroll">
+    <div class="nav-section">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" data-page="daily">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 2v2M11 2v2M2 6h12"/></svg>
+        Daily Log
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Projects</div>
+      <div class="nav-item" data-page="projects">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13V6l5-4 7 5.5V13a1 1 0 01-1 1H3a1 1 0 01-1-1z"/></svg>
+        All Projects
+      </div>
+      <div class="nav-item" data-page="risks">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l7 13H1L8 1z"/><path d="M8 6v4M8 11.5v.5" stroke-linecap="round"/></svg>
+        Risk Register
+        <span class="nav-badge" id="badge-risks">0</span>
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Execution</div>
+      <div class="nav-item" data-page="tasks">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h7" stroke-linecap="round"/></svg>
+        Action Items
+        <span class="nav-badge" id="badge-tasks">0</span>
+      </div>
+      <div class="nav-item" data-page="meetings">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2" stroke-linecap="round"/></svg>
+        Meetings &amp; MOM
+      </div>
+      <div class="nav-item" data-page="notes">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M5 6h6M5 9h4" stroke-linecap="round"/></svg>
+        Notes &amp; Decisions
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Team</div>
+      <div class="nav-item" data-page="people">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-4 5-4s5 1 5 4"/><circle cx="12" cy="6" r="2"/><path d="M14 13c0-2-1-3-3-3"/></svg>
+        Team Directory
+      </div>
+      <div class="nav-item" data-page="escalations">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l2 4h4l-3 3 1 4-4-2.5L4 12l1-4L2 5h4L8 1z" stroke-linejoin="round"/></svg>
+        Escalations
+        <span class="nav-badge amber" id="badge-esc">0</span>
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Intelligence</div>
+      <div class="nav-item" data-page="insights">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 015 5c0 2-1 3.5-2.5 4.5v1.5h-5V10.5C4 9.5 3 8 3 6a5 5 0 015-5z"/><path d="M6 13h4"/></svg>
+        PMO Insights
+      </div>
+      <div class="nav-item" data-page="reports">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 1h10a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V2a1 1 0 011-1z"/><path d="M5 5h6M5 8h6M5 11h4" stroke-linecap="round"/></svg>
+        Reports &amp; Export
+      </div>
+      <div class="nav-item" data-page="activity">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8h2l2-5 2 10 2-7 1.5 2H15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Activity Log
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">System</div>
+      <div class="nav-item" data-page="settings">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1M3.6 3.6l.7.7M11.7 11.7l.7.7M3.6 12.4l.7-.7M11.7 4.3l.7-.7"/></svg>
+        Settings &amp; Backup
+      </div>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="offline-pill"><div class="offline-dot"></div> Offline · Local Storage</div>
+    <div class="kb-hint"><kbd>Ctrl+Shift+N</kbd> Quick capture · <kbd>Esc</kbd> Close</div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <div class="topbar-page-title" id="page-title">Dashboard</div>
+    <div class="search-wrap">
+      <span class="search-icon"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="3.5"/><path d="M8 8l2.5 2.5" stroke-linecap="round"/></svg></span>
+      <input type="text" id="global-search" placeholder="Search projects, tasks, people, meetings..." autocomplete="off">
+      <div id="search-dropdown"></div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-topbar ghost" onclick="openQuickCapture()">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 1v10M1 6h10" stroke-linecap="round"/></svg>
+        Quick Note
+      </button>
+      <button class="btn-topbar" id="primary-btn" onclick="primaryAction()">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 1v10M1 6h10" stroke-linecap="round"/></svg>
+        New Project
+      </button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+</div>
+
+<!-- FAB -->
+<button class="quick-add-fab" onclick="openQuickCapture()" title="Quick Capture (Ctrl+Shift+N)">+</button>
+
+<!-- CONTAINERS -->
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+'use strict';
+
+// ─── DATABASE ──────────────────────────────────────────────────────────────
+const db = new Dexie('PMO_v3');
+db.version(1).stores({
+  projects:   '++id,name,status,priority,health,client,pm,createdAt',
+  people:     '++id,name,department,designation,email,createdAt',
+  meetings:   '++id,projectId,title,date,createdAt',
+  tasks:      '++id,projectId,assignedTo,status,priority,dueDate,createdAt',
+  notes:      '++id,projectId,type,createdAt',
+  risks:      '++id,projectId,severity,status,createdAt',
+  escalations:'++id,projectId,raisedBy,status,priority,createdAt',
+  decisions:  '++id,projectId,meetingId,createdAt',
+  activityLog:'++id,type,ref,action,createdAt',
+  tags:       '++id,name,color',
+  settings:   '++id,key,value'
+});
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+const S = {
+  page: 'dashboard',
+  sub: null,
+  projects:[], people:[], meetings:[], tasks:[], notes:[],
+  risks:[], escalations:[], decisions:[], activityLog:[],
+  searchIdx: null, searchData: [],
+  filter: {}
+};
+
+// ─── SEED DATA ─────────────────────────────────────────────────────────────
+async function seed() {
+  if(await db.projects.count()>0) return;
+  const now = Date.now();
+  const d = (days) => { const d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().split('T')[0]; };
+
+  const [p1,p2,p3,p4,p5] = await Promise.all([
+    db.projects.add({name:'ERP Migration — AXIS Corp',client:'AXIS Corp',pm:'Priya Nair',status:'active',priority:'critical',health:'at-risk',startDate:'2026-02-01',endDate:'2026-07-31',budget:'₹2.4Cr',budgetSpent:'₹1.1Cr',completion:45,description:'Full ERP migration from SAP to Oracle for AXIS Corp 3200-employee enterprise division. Includes data migration, UAT, training.',tags:['#erp','#migration','#critical','#client-escalation'],createdAt:now}),
+    db.projects.add({name:'Digital Patient Portal — MedPlus',client:'MedPlus Health',pm:'Ravi Kumar',status:'active',priority:'high',health:'healthy',startDate:'2026-03-15',endDate:'2026-09-30',budget:'₹85L',budgetSpent:'₹28L',completion:38,description:'Patient-facing digital portal with appointment booking, health records, prescription management.',tags:['#digital','#healthcare','#uat'],createdAt:now}),
+    db.projects.add({name:'Central Data Warehouse — FinSecure',client:'FinSecure Ltd',pm:'Ananya Rao',status:'active',priority:'high',health:'delayed',startDate:'2026-01-10',endDate:'2026-06-30',budget:'₹1.2Cr',budgetSpent:'₹95L',completion:72,description:'Central data warehouse for regulatory reporting and BI dashboards.',tags:['#data','#finance','#delayed','#regulatory'],createdAt:now}),
+    db.projects.add({name:'Retail Mobile App — RetailX',client:'RetailX',pm:'Priya Nair',status:'on-hold',priority:'medium',health:'healthy',startDate:'2026-04-01',endDate:'2026-10-31',budget:'₹60L',budgetSpent:'₹12L',completion:18,description:'Consumer-facing retail mobile app iOS/Android with inventory and loyalty.',tags:['#mobile','#retail','#on-hold'],createdAt:now}),
+    db.projects.add({name:'AI Customer Support — BankWave',client:'BankWave',pm:'Ananya Rao',status:'active',priority:'high',health:'critical',startDate:'2025-11-01',endDate:'2026-05-31',budget:'₹3.1Cr',budgetSpent:'₹2.9Cr',completion:88,description:'AI-powered customer support system with chatbot, escalation workflows, and agent handoff.',tags:['#ai','#banking','#critical','#overbudget'],createdAt:now})
+  ]);
+
+  const [per1,per2,per3,per4,per5,per6] = await Promise.all([
+    db.people.add({name:'Priya Nair',designation:'Senior Program Manager',department:'PMO',email:'priya.nair@pmo.in',phone:'+91-98765-43210',reportingTo:'Director PMO',role:'PM',notes:'Handles critical client relationships. AXIS escalation lead.',createdAt:now}),
+    db.people.add({name:'Ravi Kumar',designation:'Technical Architect',department:'Engineering',email:'ravi.kumar@pmo.in',phone:'+91-98765-11111',reportingTo:'Priya Nair',role:'Tech Lead',notes:'Expert in API integrations and system architecture.',createdAt:now}),
+    db.people.add({name:'Ananya Rao',designation:'Project Manager',department:'PMO',email:'ananya.rao@pmo.in',phone:'+91-98765-22222',reportingTo:'Director PMO',role:'PM',notes:'FinSecure and BankWave primary contact.',createdAt:now}),
+    db.people.add({name:'Sanjay Mehta',designation:'Senior Business Analyst',department:'Business Analysis',email:'sanjay.mehta@pmo.in',phone:'+91-98765-33333',reportingTo:'Priya Nair',role:'BA',notes:'Requirements gathering and client workshops specialist.',createdAt:now}),
+    db.people.add({name:'Deepa Iyer',designation:'QA Lead',department:'Quality',email:'deepa.iyer@pmo.in',phone:'+91-98765-44444',reportingTo:'Ravi Kumar',role:'QA',notes:'UAT coordination and test strategy.',createdAt:now}),
+    db.people.add({name:'Karan Shah',designation:'DevOps Engineer',department:'Engineering',email:'karan.shah@pmo.in',phone:'+91-98765-55555',reportingTo:'Ravi Kumar',role:'DevOps',notes:'CI/CD pipeline and cloud infra management.',createdAt:now})
+  ]);
+
+  const [m1,m2,m3] = await Promise.all([
+    db.meetings.add({projectId:p1,title:'Sprint 8 Review — ERP Migration',date:d(-2),attendees:['Priya Nair','Ravi Kumar','Sanjay Mehta','Client: AXIS CTO','Client: AXIS CFO'],agenda:'Sprint 8 delivery review, API integration status, UAT readiness, go-live planning',discussionPoints:['API integration delayed by 2 weeks due to client infra firewall issues','Data migration scripts tested on 40% dataset — 3 critical validation errors found in GL module','Client requested new executive dashboard module — outside original scope','UAT environment provisioning pending AXIS IT approval — 3 weeks delayed','Resource crunch — 2 developers on leave next week'],decisions:['Extend sprint 8 by 1 week — new end date May 28','Formal scope change process for executive dashboard — Priya to send CCR by May 22','UAT kick-off pushed from May 26 to June 3','Additional contractor resource to be onboarded by May 25'],blockers:['AXIS Corp IT firewall blocking test environment access — escalated to CTO','Data migration vendor has not delivered cleansed dataset — 10-day delay','Legal sign-off on data handling agreement pending'],actionItems:[{title:'Fix API authentication module — OAuth2 token refresh',assignedTo:'Ravi Kumar',dueDate:d(3),priority:'critical'},{title:'Send scope change request (CCR) for executive dashboard',assignedTo:'Priya Nair',dueDate:d(1),priority:'high'},{title:'Coordinate with AXIS IT for firewall whitelist',assignedTo:'Sanjay Mehta',dueDate:d(0),priority:'high'},{title:'Onboard contract resource for data migration',assignedTo:'Priya Nair',dueDate:d(4),priority:'medium'}],nextSteps:'Next review scheduled May 28. Escalation call with AXIS CTO May 22.',summary:'Sprint 8 delayed primarily due to infrastructure blockers from client side. API and data migration are critical path items. Director briefing recommended before May 22 client escalation call.',createdAt:now}),
+    db.meetings.add({projectId:p2,title:'UAT Kickoff — MedPlus Patient Portal',date:d(-1),attendees:['Ravi Kumar','Deepa Iyer','Sanjay Mehta','Client: MedPlus PM','Client: MedPlus QA Lead'],agenda:'UAT kickoff, test case walkthrough, environment setup, defect process',discussionPoints:['All 186 test cases prepared and mapped to requirements','UAT environment fully set up and smoke tested','Client QA team of 4 assigned — kick-off tomorrow','Defect triage process agreed: P1 same day, P2 within 48 hours','Go-live July 1 confirmed by MedPlus board'],decisions:['UAT starts May 22 — client team to report by 9 AM','Daily defect triage at 4 PM via Teams call','Critical defects to be triaged same day with dev team','Go-live July 1 remains confirmed target'],blockers:[],actionItems:[{title:'Share UAT credentials and test environment details',assignedTo:'Ravi Kumar',dueDate:d(1),priority:'high'},{title:'Setup JIRA defect tracking board for UAT',assignedTo:'Deepa Iyer',dueDate:d(1),priority:'medium'},{title:'Conduct client team walkthrough of test cases',assignedTo:'Sanjay Mehta',dueDate:d(2),priority:'medium'}],nextSteps:'UAT Day 1 debrief call May 23.',summary:'UAT is well-prepared. Client team engaged and motivated. No blockers currently. Green status maintained.',createdAt:now}),
+    db.meetings.add({projectId:p5,title:'Emergency Escalation — BankWave AI Project',date:d(-3),attendees:['Ananya Rao','Client: BankWave CTO','Client: BankWave PMO Head','Director PMO'],agenda:'Budget overrun discussion, timeline crisis, recovery plan',discussionPoints:['Project is 94% budget consumed with 88% delivery — ₹2.9Cr of ₹3.1Cr spent','Final integration and performance testing phase still pending','Client threatening contract penalty clause if May 31 delivery missed','AI model accuracy at 87% — client SLA requires 92%'],decisions:['Emergency recovery plan to be submitted by May 23','₹20L additional budget approved by both parties','Dedicated war room — daily standup at 8 AM','Ravi Kumar to support BankWave team for 2 weeks'],blockers:['AI model training data quality issues — 12% noise in dataset','BankWave infra team not available for integration testing until May 25'],actionItems:[{title:'Prepare recovery plan document',assignedTo:'Ananya Rao',dueDate:d(2),priority:'critical'},{title:'Fix AI model training pipeline — increase accuracy to 92%',assignedTo:'Ravi Kumar',dueDate:d(5),priority:'critical'},{title:'Escalate infra availability to BankWave CTO',assignedTo:'Ananya Rao',dueDate:d(0),priority:'critical'}],nextSteps:'Recovery plan review with BankWave board May 24.',summary:'CRITICAL project. Immediate director attention required. Penalty clause risk if deadline missed. War room established.',createdAt:now})
+  ]);
+
+  await Promise.all([
+    db.tasks.add({projectId:p1,title:'Fix API authentication module — OAuth2 token refresh',assignedTo:'Ravi Kumar',description:'Token refresh failing after 30min session. Affects all API consumers.',priority:'critical',status:'in-progress',dueDate:d(3),createdBy:'Priya Nair',meetingId:m1,createdAt:now}),
+    db.tasks.add({projectId:p1,title:'Send scope change request (CCR) for executive dashboard',assignedTo:'Priya Nair',description:'Client requesting new executive dashboard. CCR needs formal approval.',priority:'high',status:'pending',dueDate:d(1),createdBy:'Priya Nair',meetingId:m1,createdAt:now}),
+    db.tasks.add({projectId:p1,title:'Coordinate firewall whitelist with AXIS IT',assignedTo:'Sanjay Mehta',description:'Test environment blocked — need ports 443, 8080, 9000 opened.',priority:'high',status:'pending',dueDate:d(0),createdBy:'Priya Nair',meetingId:m1,createdAt:now}),
+    db.tasks.add({projectId:p1,title:'Onboard contract resource for data migration',assignedTo:'Priya Nair',description:'Need 1 senior data engineer for GL migration module.',priority:'medium',status:'pending',dueDate:d(4),createdBy:'Priya Nair',meetingId:m1,createdAt:now}),
+    db.tasks.add({projectId:p2,title:'Share UAT credentials with MedPlus team',assignedTo:'Ravi Kumar',description:'4 client users need accounts. Send via secure channel.',priority:'high',status:'pending',dueDate:d(1),createdBy:'Ravi Kumar',meetingId:m2,createdAt:now}),
+    db.tasks.add({projectId:p2,title:'Setup JIRA defect board for UAT',assignedTo:'Deepa Iyer',description:'Configure sprint board, priority fields, SLA alerts.',priority:'medium',status:'pending',dueDate:d(1),createdBy:'Ravi Kumar',meetingId:m2,createdAt:now}),
+    db.tasks.add({projectId:p2,title:'Client team walkthrough of test cases',assignedTo:'Sanjay Mehta',description:'Walk MedPlus QA team through all 186 test cases.',priority:'medium',status:'pending',dueDate:d(2),createdBy:'Ravi Kumar',meetingId:m2,createdAt:now}),
+    db.tasks.add({projectId:p3,title:'Fix 3 critical data migration script errors',assignedTo:'Ananya Rao',description:'GL module validation errors — field mapping mismatch in accounts payable.',priority:'critical',status:'overdue',dueDate:d(-3),createdBy:'Ananya Rao',createdAt:now}),
+    db.tasks.add({projectId:p3,title:'Submit monthly regulatory compliance report',assignedTo:'Ananya Rao',description:'Monthly report due to FinSecure board. Template in SharePoint.',priority:'high',status:'overdue',dueDate:d(-6),createdBy:'Ananya Rao',createdAt:now}),
+    db.tasks.add({projectId:p5,title:'Prepare emergency recovery plan document',assignedTo:'Ananya Rao',description:'Include timeline, budget breakdown, risk mitigation, go/no-go criteria.',priority:'critical',status:'in-progress',dueDate:d(2),createdBy:'Ananya Rao',meetingId:m3,createdAt:now}),
+    db.tasks.add({projectId:p5,title:'Fix AI model training pipeline — improve accuracy to 92%',assignedTo:'Ravi Kumar',description:'Current 87% accuracy. Need data cleansing + hyperparameter tuning.',priority:'critical',status:'in-progress',dueDate:d(5),createdBy:'Ananya Rao',meetingId:m3,createdAt:now}),
+    db.tasks.add({projectId:p5,title:'Escalate BankWave infra team availability',assignedTo:'Ananya Rao',description:'Integration testing blocked until May 25. CTO-level escalation.',priority:'critical',status:'done',dueDate:d(0),createdBy:'Ananya Rao',meetingId:m3,createdAt:now}),
+    db.tasks.add({projectId:p4,title:'Prepare mobile app architecture document',assignedTo:'Ravi Kumar',description:'Flutter-based architecture, API design, offline sync strategy.',priority:'medium',status:'pending',dueDate:d(14),createdBy:'Priya Nair',createdAt:now})
+  ]);
+
+  await Promise.all([
+    db.risks.add({projectId:p1,title:'API integration delay cascades into UAT timeline',severity:'critical',impact:'UAT pushed 3 weeks — July delivery at risk. Client SLA breach possible.',mitigation:'Escalate to AXIS CTO. Add 1-week buffer in plan. Parallel track API and data migration.',owner:'Priya Nair',status:'open',createdAt:now}),
+    db.risks.add({projectId:p1,title:'Scope creep — client requesting unauthorized features',severity:'high',impact:'₹30–50L cost overrun and 4-week timeline slip if uncontrolled.',mitigation:'Strict change control process. All requests go through CCR with formal approval.',owner:'Priya Nair',status:'open',createdAt:now}),
+    db.risks.add({projectId:p1,title:'Data migration vendor delay — 10 days behind',severity:'high',impact:'Data cleansing delay impacts migration testing and UAT start.',mitigation:'Engage backup vendor. Daily sync with primary vendor. Escalation to vendor CTO.',owner:'Sanjay Mehta',status:'monitoring',createdAt:now}),
+    db.risks.add({projectId:p3,title:'Data migration errors — production data integrity risk',severity:'critical',impact:'Regulatory non-compliance risk. FinSecure could face penalties.',mitigation:'Rerun with cleansed dataset. Add dual-layer validation. Bring in data audit consultant.',owner:'Ananya Rao',status:'open',createdAt:now}),
+    db.risks.add({projectId:p3,title:'Project 3 weeks behind schedule — penalty clause risk',severity:'high',impact:'₹15L penalty clause activates after June 30 if delivery missed.',mitigation:'Resource augmentation with 2 additional developers. Daily standup with client.',owner:'Ananya Rao',status:'escalated',createdAt:now}),
+    db.risks.add({projectId:p2,title:'UAT defect volume could exceed estimates',severity:'medium',impact:'Go-live delay of 1–2 weeks if defect density > 15 per 100 test cases.',mitigation:'Additional QA resources on standby. Daily triage calls. P1 same-day resolution SLA.',owner:'Deepa Iyer',status:'monitoring',createdAt:now}),
+    db.risks.add({projectId:p5,title:'Budget overrun — 94% consumed with work remaining',severity:'critical',impact:'Project may require ₹20–30L additional funding. Client relationship at risk.',mitigation:'War room established. ₹20L additional budget approved. No new scope accepted.',owner:'Ananya Rao',status:'escalated',createdAt:now}),
+    db.risks.add({projectId:p5,title:'AI model accuracy below SLA threshold (87% vs 92%)',severity:'critical',impact:'Go-live blocked by contractual accuracy SLA. Penalty clause activation.',mitigation:'Data cleansing sprint. Model retraining with augmented dataset. 3rd party model review.',owner:'Ravi Kumar',status:'open',createdAt:now})
+  ]);
+
+  await Promise.all([
+    db.escalations.add({projectId:p1,title:'AXIS IT Firewall — Test Environment Blocked',description:'AXIS Corp IT team refusing to open firewall ports for test environment. 3-week delay accumulating. Risk of UAT slip.',raisedBy:'Priya Nair',raisedTo:'AXIS CTO',priority:'critical',status:'open',resolution:'',createdAt:now}),
+    db.escalations.add({projectId:p5,title:'BankWave AI Accuracy SLA Breach Risk',description:'AI model at 87% accuracy, SLA requires 92%. May 31 deadline at risk. Contract penalty clause activation possible.',raisedBy:'Ananya Rao',raisedTo:'Director PMO + BankWave CTO',priority:'critical',status:'in-progress',resolution:'War room established. Recovery plan submitted May 23.',createdAt:now}),
+    db.escalations.add({projectId:p3,title:'FinSecure Data Vendor Delay — Regulatory Risk',description:'Data vendor 10 days late. Regulatory compliance report overdue. FinSecure board already flagged.',raisedBy:'Ananya Rao',raisedTo:'Vendor CTO + FinSecure PM',priority:'high',status:'open',resolution:'',createdAt:now})
+  ]);
+
+  await Promise.all([
+    db.decisions.add({projectId:p1,meetingId:m1,title:'Sprint 8 extended by 1 week',rationale:'API integration delay from client infra. Not controllable from our side.',madeBy:'Priya Nair',date:d(-2),impactArea:'Timeline',createdAt:now}),
+    db.decisions.add({projectId:p1,meetingId:m1,title:'Executive dashboard requires formal CCR process',rationale:'New feature outside original scope. Client requesting post-contract addition.',madeBy:'Priya Nair + AXIS CTO',date:d(-2),impactArea:'Scope',createdAt:now}),
+    db.decisions.add({projectId:p2,meetingId:m2,title:'UAT go-live target July 1 confirmed',rationale:'All preparation complete. Client team aligned. No blockers.',madeBy:'Ravi Kumar + MedPlus PM',date:d(-1),impactArea:'Timeline',createdAt:now}),
+    db.decisions.add({projectId:p5,meetingId:m3,title:'Additional ₹20L budget approved for BankWave',rationale:'Recovery plan accepted. Both parties agree on additional scope.',madeBy:'Director PMO + BankWave CTO',date:d(-3),impactArea:'Budget',createdAt:now}),
+    db.decisions.add({projectId:p5,meetingId:m3,title:'War room daily standup 8 AM established',rationale:'Critical project needs daily director visibility and immediate decision-making.',madeBy:'Ananya Rao + BankWave PMO',date:d(-3),impactArea:'Governance',createdAt:now})
+  ]);
+
+  await Promise.all([
+    db.notes.add({projectId:p1,type:'escalation',title:'AXIS IT escalation — Director briefing note',content:'Director PMO must be briefed before May 22 call with AXIS CTO. Key point: this is a client-side infrastructure failure, not a delivery failure. Our SLA obligations should be formally recalibrated.',createdAt:now}),
+    db.notes.add({projectId:p5,type:'decision',title:'BankWave war room protocol',content:'Daily standup at 8 AM. Ananya owns agenda. All blockers resolved same day or escalated. Director PMO on call.',createdAt:now}),
+    db.notes.add({projectId:null,type:'general',title:'Director PMO weekly talking points — May 21',content:'1. AXIS ERP — API delay is client-caused. Timeline extension to be formally documented.\n2. BankWave — War room day 3. Recovery plan tracking positive.\n3. FinSecure — Regulatory report overdue. Need vendor escalation this week.\n4. MedPlus — Green. UAT starting smoothly.\n5. Resource crunch — Ravi Kumar across 3 critical projects. Risk.',createdAt:now})
+  ]);
+
+  const actNow = Date.now();
+  await Promise.all([
+    db.activityLog.add({type:'meeting',ref:m3,action:'Emergency escalation meeting logged — BankWave',user:'Ananya Rao',createdAt:actNow-3600000*5}),
+    db.activityLog.add({type:'risk',ref:null,action:'Critical risk added: AI accuracy SLA breach — BankWave',user:'Ananya Rao',createdAt:actNow-3600000*4}),
+    db.activityLog.add({type:'task',ref:null,action:'Task completed: BankWave CTO escalation',user:'Ananya Rao',createdAt:actNow-3600000*2}),
+    db.activityLog.add({type:'meeting',ref:m2,action:'UAT Kickoff meeting logged — MedPlus',user:'Ravi Kumar',createdAt:actNow-3600000*26}),
+    db.activityLog.add({type:'task',ref:null,action:'Sprint review tasks created — AXIS ERP',user:'Priya Nair',createdAt:actNow-3600000*50})
+  ]);
+}
+
+// ─── LOAD ───────────────────────────────────────────────────────────────────
+async function loadAll() {
+  [S.projects, S.people, S.meetings, S.tasks, S.notes,
+   S.risks, S.escalations, S.decisions, S.activityLog] = await Promise.all([
+    db.projects.toArray(), db.people.toArray(), db.meetings.toArray(),
+    db.tasks.toArray(), db.notes.toArray(), db.risks.toArray(),
+    db.escalations.toArray(), db.decisions.toArray(), db.activityLog.toArray()
+  ]);
+  updateBadges();
+  buildSearchIndex();
+}
+
+function updateBadges() {
+  const openT = S.tasks.filter(t=>t.status!=='done').length;
+  const openR = S.risks.filter(r=>r.status==='open'||r.status==='escalated').length;
+  const openE = S.escalations.filter(e=>e.status==='open'||e.status==='in-progress').length;
+  el('badge-tasks').textContent = openT; el('badge-tasks').style.display = openT?'':'none';
+  el('badge-risks').textContent = openR; el('badge-risks').style.display = openR?'':'none';
+  el('badge-esc').textContent = openE; el('badge-esc').style.display = openE?'':'none';
+}
+
+// ─── UTILS ──────────────────────────────────────────────────────────────────
+const el = (id) => document.getElementById(id);
+const $ = (s,ctx=document) => ctx.querySelector(s);
+const $$ = (s,ctx=document) => [...ctx.querySelectorAll(s)];
+const fmtDate = (d) => { if(!d) return '—'; try{ return new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})} catch{return d}};
+const isOverdue = (d,status) => d && status!=='done' && new Date(d+'T23:59:59') < new Date();
+const daysLeft = (d) => { if(!d) return null; return Math.ceil((new Date(d)-new Date())/(864e5)); };
+const getProj = (id) => S.projects.find(p=>p.id===id);
+const getAvatarStyle = (name) => {
+  const palettes = [['#3b82f6','#1e3a8a'],['#10b981','#064e3b'],['#8b5cf6','#4c1d95'],['#ef4444','#7f1d1d'],['#f59e0b','#78350f'],['#06b6d4','#164e63'],['#ec4899','#831843'],['#84cc16','#365314']];
+  const i=(name||'').charCodeAt(0)%palettes.length; return `background:${palettes[i][0]};color:#fff`;
+};
+const initials = (name) => (name||'?').trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();
+const healthBadge = (h) => { const m={healthy:['badge-green','Healthy'],'at-risk':['badge-amber','At Risk'],delayed:['badge-purple','Delayed'],critical:['badge-red','Critical']}; const [c,l]=m[h]||['badge-gray',h]; return `<span class="badge ${c}">${l}</span>`; };
+const statusBadge = (s) => { const m={active:'badge-blue',completed:'badge-green','on-hold':'badge-gray',cancelled:'badge-red',pending:'badge-amber','in-progress':'badge-teal',done:'badge-green',overdue:'badge-red'}; return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`; };
+const priBadge = (p) => { const m={critical:'badge-red',high:'badge-amber',medium:'badge-blue',low:'badge-green'}; return `<span class="badge ${m[p]||'badge-gray'}">${p}</span>`; };
+const sevBadge = (s) => { const m={critical:'badge-red',high:'badge-amber',medium:'badge-blue',low:'badge-green'}; return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`; };
+const riskStBadge = (s) => { const m={open:'badge-red',escalated:'badge-red',monitoring:'badge-amber',mitigated:'badge-green',closed:'badge-gray'}; return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`; };
+const escStBadge = (s) => { const m={'in-progress':'badge-teal',open:'badge-red',resolved:'badge-green',closed:'badge-gray'}; return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`; };
+const avt = (name,size=28) => `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.36)}px;${getAvatarStyle(name)}">${initials(name)}</div>`;
+const escSvg = `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M6 1v10M1 6h10" stroke-linecap="round"/></svg>`;
+
+// ─── SEARCH ─────────────────────────────────────────────────────────────────
+function buildSearchIndex() {
+  const docs = [];
+  S.projects.forEach(p=>docs.push({k:'project',title:p.name,sub:p.client+' · '+p.status,id:p.id,page:'projects'}));
+  S.people.forEach(p=>docs.push({k:'person',title:p.name,sub:p.designation+' · '+p.department,id:p.id,page:'people'}));
+  S.meetings.forEach(m=>{ const pr=getProj(m.projectId); docs.push({k:'meeting',title:m.title,sub:(pr?pr.name:'')+'·'+m.date,id:m.id,page:'meetings'}); });
+  S.tasks.forEach(t=>docs.push({k:'task',title:t.title,sub:t.assignedTo+'·'+t.status,id:t.id,page:'tasks'}));
+  S.risks.forEach(r=>{ const pr=getProj(r.projectId); docs.push({k:'risk',title:r.title,sub:(pr?pr.name:'')+' · '+r.severity,id:r.id,page:'risks'}); });
+  S.escalations.forEach(e=>docs.push({k:'escalation',title:e.title,sub:e.raisedBy+' · '+e.priority,id:e.id,page:'escalations'}));
+  S.notes.forEach(n=>docs.push({k:'note',title:n.title||n.content.substring(0,60),sub:n.type,id:n.id,page:'notes'}));
+  S.searchData = docs;
+  S.searchIdx = new Fuse(docs,{keys:['title','sub'],threshold:0.38});
+}
+
+el('global-search').addEventListener('input', function() {
+  const q=this.value.trim();
+  const dd=el('search-dropdown');
+  if(!q||q.length<2){dd.style.display='none';return;}
+  const results=S.searchIdx.search(q).slice(0,8);
+  if(!results.length){dd.style.display='none';return;}
+  const typeColors={project:'badge-blue',person:'badge-teal',meeting:'badge-purple',task:'badge-amber',risk:'badge-red',escalation:'badge-pink',note:'badge-gray'};
+  dd.innerHTML=results.map(r=>`<div class="search-item" onclick="navigate('${r.item.page}')">
+    <span class="search-item-type ${typeColors[r.item.k]}">${r.item.k}</span>
+    <div><div class="search-item-title">${r.item.title}</div><div class="search-item-sub">${r.item.sub}</div></div>
+  </div>`).join('');
+  dd.style.display='block';
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('.search-wrap')) el('search-dropdown').style.display='none'; });
+
+// ─── NAVIGATION ─────────────────────────────────────────────────────────────
+async function navigate(page, sub) {
+  S.page=page; S.sub=sub||null;
+  $$('.nav-item').forEach(el=>el.classList.remove('active'));
+  const ni=document.querySelector(`.nav-item[data-page="${page}"]`);
+  if(ni) ni.classList.add('active');
+  const titles={dashboard:'Dashboard',daily:'Daily Log',projects:'Projects',tasks:'Action Items',meetings:'Meetings & MOM',notes:'Notes & Decisions',people:'Team Directory',risks:'Risk Register',escalations:'Escalations',insights:'PMO Insights',reports:'Reports & Export',activity:'Activity Log',settings:'Settings & Backup'};
+  el('page-title').textContent = titles[page]||page;
+  const primaryLabels={dashboard:'New Project',projects:'New Project',tasks:'New Task',meetings:'New Meeting',people:'New Person',risks:'New Risk',escalations:'New Escalation',notes:'New Note',insights:'',reports:'',activity:'',daily:'',settings:''};
+  const pb=el('primary-btn');
+  pb.style.display=primaryLabels[page]?'':'none';
+  pb.childNodes[1]&&(pb.childNodes[1].textContent=' '+primaryLabels[page]);
+  await loadAll();
+  const content=el('content');
+  content.innerHTML='';
+  content.className='';
+  const renders={dashboard:renderDashboard,daily:renderDaily,projects:renderProjects,tasks:renderTasks,meetings:renderMeetings,notes:renderNotes,people:renderPeople,risks:renderRisks,escalations:renderEscalations,insights:renderInsights,reports:renderReports,activity:renderActivity,settings:renderSettings};
+  if(renders[page]) renders[page]();
+  void content.offsetWidth;
+  content.classList.add('fade-up');
+}
+
+function primaryAction() {
+  const actions={dashboard:openProjectModal,projects:()=>S.sub?openMeetingModal(S.sub):openProjectModal(),tasks:openTaskModal,meetings:openMeetingModal,people:openPersonModal,risks:openRiskModal,escalations:openEscalationModal,notes:openNoteModal};
+  if(actions[S.page]) actions[S.page]();
+}
+
+// ─── RENDER: DASHBOARD ───────────────────────────────────────────────────────
+function renderDashboard() {
+  const c=el('content');
+  const active=S.projects.filter(p=>p.status==='active');
+  const delayed=S.projects.filter(p=>p.health==='delayed');
+  const critical=S.projects.filter(p=>p.health==='critical');
+  const atRisk=S.projects.filter(p=>p.health==='at-risk');
+  const pendT=S.tasks.filter(t=>t.status!=='done');
+  const overdueT=S.tasks.filter(t=>isOverdue(t.dueDate,t.status));
+  const openR=S.risks.filter(r=>r.status==='open'||r.status==='escalated');
+  const openE=S.escalations.filter(e=>e.status==='open'||e.status==='in-progress');
+  const workload={};
+  pendT.forEach(t=>{ workload[t.assignedTo]=(workload[t.assignedTo]||0)+1; });
+  const topPeople=Object.entries(workload).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const hc={healthy:0,'at-risk':0,delayed:0,critical:0};
+  S.projects.forEach(p=>{ if(p.health in hc) hc[p.health]++; });
+  const recentM=[...S.meetings].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,4);
+  const overdueList=overdueT.slice(0,6);
+
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Director Dashboard</div><div class="page-sub">PMO Intelligence · ${new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div></div>
+
+  <div class="g4 stagger" style="margin-bottom:16px">
+    <div class="metric-card" onclick="navigate('projects')">
+      <div class="metric-val" style="color:var(--accent)">${active.length}</div>
+      <div class="metric-label">Active Projects</div>
+      <div class="metric-sub" style="color:var(--text3)">${S.projects.length} total in portfolio</div>
+    </div>
+    <div class="metric-card" onclick="navigate('tasks')">
+      <div class="metric-val" style="color:${overdueT.length>0?'var(--red)':'var(--amber)}'}">${overdueT.length}</div>
+      <div class="metric-label">Overdue Actions</div>
+      <div class="metric-sub" style="color:var(--text3)">${pendT.length} total pending</div>
+    </div>
+    <div class="metric-card" onclick="navigate('risks')">
+      <div class="metric-val" style="color:var(--red)">${openR.length}</div>
+      <div class="metric-label">Open Risks</div>
+      <div class="metric-sub" style="color:var(--text3)">${critical.length+atRisk.length} projects at risk</div>
+    </div>
+    <div class="metric-card" onclick="navigate('escalations')">
+      <div class="metric-val" style="color:var(--purple)">${openE.length}</div>
+      <div class="metric-label">Live Escalations</div>
+      <div class="metric-sub" style="color:var(--text3)">${S.escalations.length} total raised</div>
+    </div>
+  </div>
+
+  ${openE.length ? `<div class="insight-card" style="border-color:var(--red);background:var(--red-soft);margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px">⚡ ACTIVE ESCALATIONS REQUIRING DIRECTOR ATTENTION</div>
+      <span onclick="navigate('escalations')" style="font-size:11px;color:var(--accent);cursor:pointer">View all →</span>
+    </div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+      ${S.escalations.filter(e=>e.status!=='resolved'&&e.status!=='closed').map(e=>{const pr=getProj(e.projectId);return`<div style="display:flex;align-items:flex-start;gap:10px">
+        <div class="status-dot dot-red" style="margin-top:5px;flex-shrink:0"></div>
+        <div><span style="font-size:12px;font-weight:600;color:var(--text)">${e.title}</span> — <span style="font-size:11px;color:var(--text2)">${pr?pr.name:''} · Raised to: ${e.raisedTo}</span></div>
+        ${priBadge(e.priority)}
+      </div>`}).join('')}
+    </div>
+  </div>` : ''}
+
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="section-label">Project Health Breakdown</div>
+      ${[['healthy','Healthy','var(--green)'],['at-risk','At Risk','var(--amber)'],['delayed','Delayed','var(--purple)'],['critical','Critical','var(--red)']].map(([key,label,color])=>{
+        const count=hc[key]||0; const pct=Math.round(count/Math.max(S.projects.length,1)*100);
+        return`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;color:var(--text)">${label}</span><span style="font-size:12px;font-weight:700;color:${color}">${count} project${count!==1?'s':''}</span></div><div class="progress"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+      }).join('')}
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        ${S.projects.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer" onclick="navigate('projects',${p.id})">
+          <div class="status-dot ${p.health==='healthy'?'dot-green':p.health==='at-risk'?'dot-amber':p.health==='delayed'?'dot-purple':'dot-red'}"></div>
+          <span style="font-size:11px;flex:1;color:var(--text)">${p.name}</span>
+          <span style="font-size:10px;color:var(--text3)">${p.completion||0}%</span>
+          ${healthBadge(p.health)}
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-label">Team Workload (Pending Tasks)</div>
+      ${topPeople.map(([name,count])=>{
+        const maxC=topPeople[0][1]; const pct=Math.round(count/maxC*100);
+        const color=count>=5?'var(--red)':count>=3?'var(--amber)':'var(--green)';
+        return`<div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">${avt(name,24)}<span style="font-size:12px;flex:1;color:var(--text)">${name}</span><span style="font-size:12px;font-weight:700;color:${color}">${count}</span></div><div class="progress"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+      }).join('')}
+      ${!topPeople.length?'<div style="color:var(--text3);font-size:12px;padding:12px 0">All clear — no pending tasks</div>':''}
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <div class="section-label" style="margin-bottom:8px">Budget Utilisation</div>
+        ${S.projects.filter(p=>p.budget).map(p=>{
+          const spent=parseInt((p.budgetSpent||'0').replace(/[^0-9]/g,''))||0;
+          const total=parseInt((p.budget||'0').replace(/[^0-9]/g,''))||1;
+          const pct=Math.min(100,Math.round(spent/total*100));
+          const color=pct>=90?'var(--red)':pct>=75?'var(--amber)':'var(--green)';
+          return`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;color:var(--text2)">${p.name.split(' — ')[0]}</span><span style="font-size:10px;font-weight:700;color:${color}">${pct}%</span></div><div class="progress"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>
+
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-label" style="margin:0">Recent Meetings</div>
+        <span onclick="navigate('meetings')" style="font-size:11px;color:var(--accent);cursor:pointer">All meetings →</span>
+      </div>
+      ${recentM.map(m=>{const pr=getProj(m.projectId);return`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigate('meetings',${m.id})">
+        <div style="font-size:12px;font-weight:600;color:var(--text)">${m.title}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${pr?pr.name:'—'} · ${fmtDate(m.date)}</div>
+        <div style="display:flex;gap:8px;margin-top:5px">
+          ${m.actionItems?.length?`<span style="font-size:10px;color:var(--amber)">${m.actionItems.length} actions</span>`:''}
+          ${m.blockers?.length?`<span style="font-size:10px;color:var(--red)">${m.blockers.length} blocker${m.blockers.length>1?'s':''}</span>`:''}
+          ${m.decisions?.length?`<span style="font-size:10px;color:var(--green)">${m.decisions.length} decision${m.decisions.length>1?'s':''}</span>`:''}
+        </div>
+      </div>`}).join('')}
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-label" style="margin:0;color:var(--red)">⚠ Overdue & Critical Actions</div>
+        <span onclick="navigate('tasks')" style="font-size:11px;color:var(--accent);cursor:pointer">All tasks →</span>
+      </div>
+      ${overdueList.map(t=>{const pr=getProj(t.projectId);const days=Math.abs(daysLeft(t.dueDate)||0);return`<div style="padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <div class="status-dot dot-red" style="margin-top:4px;flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500;color:var(--text)">${t.title}</div>
+            <div style="font-size:10px;color:var(--text2);margin-top:2px">${avt(t.assignedTo,16)} <span style="margin-left:4px">${t.assignedTo}</span></div>
+          </div>
+          <div style="text-align:right">
+            ${priBadge(t.priority)}
+            <div style="font-size:10px;color:var(--red);margin-top:3px">${days}d overdue</div>
+          </div>
+        </div>
+      </div>`}).join('')}
+      ${!overdueList.length?'<div style="color:var(--green);font-size:12px;padding:12px 0;text-align:center">✓ No overdue tasks</div>':''}
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div class="section-label" style="margin:0">All Projects — Portfolio View</div>
+      <button class="btn btn-ghost btn-sm" onclick="navigate('projects')">Manage Projects →</button>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Project</th><th>Client</th><th>PM</th><th>Health</th><th>Status</th><th>Priority</th><th>Progress</th><th>Open Risks</th><th>Pending Tasks</th></tr></thead>
+      <tbody>${S.projects.map(p=>{
+        const pR=S.risks.filter(r=>r.projectId===p.id&&r.status!=='closed').length;
+        const pT=S.tasks.filter(t=>t.projectId===p.id&&t.status!=='done').length;
+        return`<tr onclick="navigate('projects',${p.id})">
+          <td style="font-weight:600;max-width:200px">${p.name}</td>
+          <td class="muted">${p.client}</td>
+          <td><div style="display:flex;align-items:center;gap:6px">${avt(p.pm,22)}<span style="font-size:11px">${p.pm}</span></div></td>
+          <td>${healthBadge(p.health)}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td>${priBadge(p.priority)}</td>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="progress" style="width:60px"><div class="progress-fill" style="width:${p.completion||0}%;background:var(--accent)"></div></div><span style="font-size:10px;color:var(--text3)">${p.completion||0}%</span></div></td>
+          <td style="color:${pR>1?'var(--red)':'var(--text2)'}">${pR}</td>
+          <td style="color:${pT>3?'var(--amber)':'var(--text2)'}">${pT}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+// ─── RENDER: DAILY ───────────────────────────────────────────────────────────
+function renderDaily() {
+  const c=el('content'); const today=new Date().toISOString().split('T')[0];
+  const todayT=S.tasks.filter(t=>t.dueDate===today&&t.status!=='done');
+  const todayM=S.meetings.filter(m=>m.date===today);
+  const overdueT=S.tasks.filter(t=>isOverdue(t.dueDate,t.status));
+  const todayNotes=S.notes.filter(n=>new Date(n.createdAt).toISOString().split('T')[0]===today);
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">${new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><div class="page-sub">Daily PMO Workspace</div></div></div>
+  <div class="g4 stagger" style="margin-bottom:18px">
+    <div class="metric-card"><div class="metric-val" style="color:var(--accent)">${todayM.length}</div><div class="metric-label">Meetings Today</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--amber)">${todayT.length}</div><div class="metric-label">Tasks Due Today</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--red)">${overdueT.length}</div><div class="metric-label">Overdue Items</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--green)">${S.tasks.filter(t=>t.status==='done'&&new Date(t.createdAt).toISOString().split('T')[0]===today).length}</div><div class="metric-label">Completed Today</div></div>
+  </div>
+  <div class="g2">
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="section-label">Quick Capture</div>
+        <textarea class="form-textarea" id="daily-text" placeholder="Type notes, decisions, follow-ups..." style="min-height:100px"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <select class="form-select" id="daily-type" style="flex:1"><option value="general">General Note</option><option value="decision">Decision</option><option value="escalation">Escalation Note</option><option value="risk">Risk Note</option></select>
+          <select class="form-select" id="daily-proj" style="flex:1"><option value="">No Project</option>${S.projects.map(p=>`<option value="${p.id}">${p.name.split(' — ')[0]}</option>`).join('')}</select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary" onclick="saveDailyNote()" style="flex:1">Save Note</button>
+          <button class="btn btn-ghost" onclick="openTaskModal()">+ Task</button>
+          <button class="btn btn-ghost" onclick="openMeetingModal()">+ Meeting</button>
+          <button class="btn btn-ghost" onclick="openRiskModal()">+ Risk</button>
+        </div>
+      </div>
+      ${overdueT.length?`<div class="card" style="border-color:rgba(239,68,68,0.25)">
+        <div class="section-label" style="color:var(--red)">⚠ Overdue — Needs Attention</div>
+        ${overdueT.map(t=>`<div class="action-item-row">
+          <div class="ai-checkbox" onclick="markDone(${t.id},this)" style="border-color:var(--red)"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:500;color:var(--text)">${t.title}</div><div style="font-size:10px;color:var(--text2);margin-top:2px">${t.assignedTo} · Due ${fmtDate(t.dueDate)}</div></div>
+          ${priBadge(t.priority)}
+        </div>`).join('')}
+      </div>`:''}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="section-label">Today's Meetings</div>
+        ${todayM.length?todayM.map(m=>{const pr=getProj(m.projectId);return`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigate('meetings',${m.id})"><div style="font-size:12px;font-weight:600">${m.title}</div><div style="font-size:11px;color:var(--text2)">${pr?pr.name:''}</div></div>`;}).join(''):`<div style="color:var(--text3);font-size:12px;padding:8px 0">No meetings today</div>`}
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="openMeetingModal()">+ Log Meeting</button>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="section-label">Tasks Due Today</div>
+        ${todayT.length?todayT.map(t=>`<div class="action-item-row">
+          <div class="ai-checkbox" onclick="markDone(${t.id},this)"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:500">${t.title}</div><div style="font-size:10px;color:var(--text2)">${t.assignedTo}</div></div>
+          ${priBadge(t.priority)}
+        </div>`).join(''):`<div style="color:var(--green);font-size:12px;padding:8px 0">✓ No tasks due today</div>`}
+      </div>
+      ${todayNotes.length?`<div class="card">
+        <div class="section-label">Notes Logged Today</div>
+        ${todayNotes.map(n=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px">${n.type?.toUpperCase()}</div><div style="font-size:11px;color:var(--text);line-height:1.6">${n.content.substring(0,150)}${n.content.length>150?'…':''}</div></div>`).join('')}
+      </div>`:''}
+    </div>
+  </div>`;
+}
+
+async function saveDailyNote() {
+  const content=el('daily-text')?.value?.trim(); if(!content) return;
+  await db.notes.add({content,type:el('daily-type')?.value||'general',projectId:parseInt(el('daily-proj')?.value)||null,title:content.substring(0,60),createdAt:Date.now()});
+  el('daily-text').value=''; await loadAll(); toast('Note saved','success'); renderDaily();
+}
+
+// ─── RENDER: PROJECTS ────────────────────────────────────────────────────────
+function renderProjects() {
+  if(S.sub) { renderProjectDetail(S.sub); return; }
+  const c=el('content');
+  c.innerHTML=`
+  <div class="section-head">
+    <div><div class="page-title">Projects</div><div class="page-sub">${S.projects.length} projects · ${S.projects.filter(p=>p.status==='active').length} active</div></div>
+    <div style="display:flex;gap:8px">
+      <select class="form-select" style="width:130px" onchange="filterProjectsBy(this.value,'status')"><option value="">All Status</option><option>active</option><option>on-hold</option><option>completed</option></select>
+      <select class="form-select" style="width:130px" onchange="filterProjectsBy(this.value,'health')"><option value="">All Health</option><option value="healthy">Healthy</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option><option value="critical">Critical</option></select>
+      <button class="btn btn-primary" onclick="openProjectModal()">${escSvg} New Project</button>
+    </div>
+  </div>
+  <div class="g-auto-lg stagger" id="project-grid">${renderProjectCards(S.projects)}</div>`;
+}
+
+function renderProjectCards(projects) {
+  return projects.map(p=>{
+    const pT=S.tasks.filter(t=>t.projectId===p.id&&t.status!=='done').length;
+    const pOT=S.tasks.filter(t=>t.projectId===p.id&&isOverdue(t.dueDate,t.status)).length;
+    const pR=S.risks.filter(r=>r.projectId===p.id&&r.status!=='closed').length;
+    const pM=S.meetings.filter(m=>m.projectId===p.id).length;
+    const borderColor=p.health==='critical'?'var(--red)':p.health==='at-risk'?'var(--amber)':p.health==='delayed'?'var(--purple)':'var(--border)';
+    return`<div class="card card-hover" style="cursor:pointer;border-left:3px solid ${borderColor}" onclick="navigate('projects',${p.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="flex:1;padding-right:10px"><div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px">${p.name}</div><div style="font-size:11px;color:var(--text2)">${p.client}</div></div>
+        ${healthBadge(p.health)}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.5">${p.description?.substring(0,100)||''}${p.description?.length>100?'…':''}</div>
+      <div class="progress" style="margin-bottom:12px"><div class="progress-fill" style="width:${p.completion||0}%;background:var(--accent)"></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${statusBadge(p.status)} ${priBadge(p.priority)}</div>
+      <div style="display:flex;gap:14px;font-size:11px;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;align-items:center">
+        <span>${avt(p.pm,20)} <span style="margin-left:4px">${p.pm}</span></span>
+        <span style="color:${pT>0?'var(--amber)':'var(--text3)'}">${pT} tasks</span>
+        <span style="color:${pOT>0?'var(--red)':'var(--text3)'}">${pOT>0?pOT+' overdue':''}</span>
+        <span style="color:${pR>0?'var(--red)':'var(--text3)'}">${pR} risks</span>
+        <span style="margin-left:auto;color:var(--text3)">${pM} meetings</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.filterProjectsBy = function(val,field) {
+  const filtered=val?S.projects.filter(p=>p[field]===val):S.projects;
+  const g=el('project-grid'); if(g) g.innerHTML=renderProjectCards(filtered);
+};
+
+function renderProjectDetail(pid) {
+  const p=S.projects.find(pr=>pr.id===pid); if(!p){S.sub=null;renderProjects();return;}
+  const pT=S.tasks.filter(t=>t.projectId===pid);
+  const pR=S.risks.filter(r=>r.projectId===pid);
+  const pM=S.meetings.filter(m=>m.projectId===pid).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const pN=S.notes.filter(n=>n.projectId===pid);
+  const pD=S.decisions.filter(d=>d.projectId===pid);
+  const pE=S.escalations.filter(e=>e.projectId===pid);
+  const c=el('content');
+  c.innerHTML=`
+  <div style="margin-bottom:14px"><span onclick="S.sub=null;navigate('projects')" style="font-size:12px;color:var(--accent);cursor:pointer">← All Projects</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div><div style="font-size:20px;font-weight:800;letter-spacing:-0.4px">${p.name}</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px">${p.client} · PM: ${p.pm} · ${fmtDate(p.startDate)} → ${fmtDate(p.endDate)}</div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${healthBadge(p.health)} ${statusBadge(p.status)} ${priBadge(p.priority)}</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="openMeetingModal(${pid})">+ Meeting</button>
+      <button class="btn btn-ghost btn-sm" onclick="openTaskModal(${pid})">+ Task</button>
+      <button class="btn btn-ghost btn-sm" onclick="openRiskModal(${pid})">+ Risk</button>
+      <button class="btn btn-ghost btn-sm" onclick="openNoteModal(${pid})">+ Note</button>
+      <button class="btn btn-primary btn-sm" onclick="exportProject(${pid})">↓ Export</button>
+    </div>
+  </div>
+  <div class="g4 stagger" style="margin-bottom:18px">
+    <div class="metric-card"><div class="metric-val" style="color:var(--amber)">${pT.filter(t=>t.status!=='done').length}</div><div class="metric-label">Pending Tasks</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--red)">${pT.filter(t=>isOverdue(t.dueDate,t.status)).length}</div><div class="metric-label">Overdue</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--red)">${pR.filter(r=>r.status!=='closed').length}</div><div class="metric-label">Open Risks</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--accent)">${pM.length}</div><div class="metric-label">Meetings</div></div>
+  </div>
+  ${p.budget?`<div class="card" style="margin-bottom:16px">
+    <div class="section-label">Budget Tracking</div>
+    <div class="g3">
+      <div><div style="font-size:11px;color:var(--text3)">Total Budget</div><div style="font-size:16px;font-weight:700;margin-top:3px">${p.budget}</div></div>
+      <div><div style="font-size:11px;color:var(--text3)">Spent</div><div style="font-size:16px;font-weight:700;margin-top:3px;color:${p.completion>=90?'var(--red)':'var(--text)'}">${p.budgetSpent||'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3)">Completion</div><div style="font-size:16px;font-weight:700;margin-top:3px;color:var(--accent)">${p.completion||0}%</div></div>
+    </div>
+    <div class="progress" style="margin-top:12px;height:8px"><div class="progress-fill" style="width:${p.completion||0}%;background:${p.completion>=90?'var(--red)':p.completion>=70?'var(--amber)':'var(--accent)'}"></div></div>
+  </div>`:''}
+  <div class="tabs" id="proj-tabs">
+    <div class="tab active" onclick="switchTab('proj-tabs','proj-meetings',this)">Meetings (${pM.length})</div>
+    <div class="tab" onclick="switchTab('proj-tabs','proj-tasks',this)">Tasks (${pT.length})</div>
+    <div class="tab" onclick="switchTab('proj-tabs','proj-risks',this)">Risks (${pR.length})</div>
+    <div class="tab" onclick="switchTab('proj-tabs','proj-decisions',this)">Decisions (${pD.length})</div>
+    <div class="tab" onclick="switchTab('proj-tabs','proj-escalations',this)">Escalations (${pE.length})</div>
+    <div class="tab" onclick="switchTab('proj-tabs','proj-notes',this)">Notes (${pN.length})</div>
+    <div class="tab" onclick="switchTab('proj-tabs','proj-overview',this)">Overview</div>
+  </div>
+  <div id="proj-meetings">${pM.length?pM.map(m=>`<div class="card card-hover" style="margin-bottom:10px;cursor:pointer" onclick="navigate('meetings',${m.id})">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="font-size:13px;font-weight:700">${m.title}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${fmtDate(m.date)} · ${m.attendees?.length||0} attendees</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${m.actionItems?.length?`<span class="badge badge-amber">${m.actionItems.length} actions</span>`:''} ${m.blockers?.length?`<span class="badge badge-red">${m.blockers.length} blockers</span>`:''}</div>
+    </div>
+    ${m.decisions?.length?`<div style="margin-top:8px;font-size:11px;color:var(--text2)"><span style="color:var(--green);font-weight:700">✓</span> ${m.decisions.slice(0,2).join(' · ')}${m.decisions.length>2?'…':''}</div>`:''}
+  </div>`).join(''):`<div class="empty-state"><div class="empty-icon">◷</div><div class="empty-label">No meetings logged</div><button class="btn btn-primary" onclick="openMeetingModal(${pid})">Log First Meeting</button></div>`}</div>
+  <div id="proj-tasks" style="display:none">${pT.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Task</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>${pT.map(t=>`<tr><td style="font-weight:500;max-width:200px">${t.title}</td><td><div style="display:flex;align-items:center;gap:6px">${avt(t.assignedTo,22)}<span style="font-size:11px">${t.assignedTo}</span></div></td><td>${priBadge(t.priority)}</td><td>${statusBadge(t.status)}</td><td class="${isOverdue(t.dueDate,t.status)?'danger':'muted'}">${fmtDate(t.dueDate)}</td><td><div style="display:flex;gap:4px">${t.status!=='done'?`<button class="btn btn-success btn-xs" onclick="markDoneById(${t.id})">✓</button>`:''}<button class="btn btn-danger btn-xs" onclick="deleteTask(${t.id})">✕</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-label">No tasks yet</div><button class="btn btn-primary" onclick="openTaskModal(${pid})">Add Task</button></div>`}</div>
+  <div id="proj-risks" style="display:none">${pR.length?pR.map(r=>`<div class="risk-row" style="border-left:3px solid ${r.severity==='critical'?'var(--red)':r.severity==='high'?'var(--amber)':r.severity==='medium'?'var(--accent)':'var(--green)'}">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${r.title}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${r.impact}</div></div>
+      <div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">${sevBadge(r.severity)} ${riskStBadge(r.status)}</div>
+    </div>
+    <div style="font-size:11px;color:var(--teal)">↳ ${r.mitigation}</div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px"><span style="font-size:10px;color:var(--text3)">Owner: ${r.owner}</span>${r.status!=='closed'?`<button class="btn btn-success btn-xs" onclick="closeRiskById(${r.id})">Mark Closed</button>`:''}</div>
+  </div>`).join(''):`<div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-label">No risks</div><button class="btn btn-primary" onclick="openRiskModal(${pid})">Add Risk</button></div>`}</div>
+  <div id="proj-decisions" style="display:none">${pD.length?pD.map(d=>`<div class="note-block nb-decision"><div style="font-size:12px;font-weight:700;color:var(--green)">${d.title}</div><div style="font-size:11px;color:var(--text2);margin-top:5px">${d.rationale}</div><div style="font-size:10px;color:var(--text3);margin-top:5px">${d.madeBy} · ${fmtDate(d.date)} · <span style="color:var(--accent)">${d.impactArea}</span></div></div>`).join(''):`<div class="empty-state"><div class="empty-label">No decisions logged</div></div>`}</div>
+  <div id="proj-escalations" style="display:none">${pE.length?pE.map(e=>`<div class="risk-row" style="border-left:3px solid var(--red)">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px"><div style="flex:1"><div style="font-size:13px;font-weight:700">${e.title}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${e.description?.substring(0,120)}${e.description?.length>120?'…':''}</div></div><div style="display:flex;gap:6px">${priBadge(e.priority)} ${escStBadge(e.status)}</div></div>
+    <div style="font-size:10px;color:var(--text3)">Raised by: ${e.raisedBy} → ${e.raisedTo} · ${fmtDate(e.createdAt)}</div>
+    ${e.resolution?`<div style="font-size:11px;color:var(--green);margin-top:6px">Resolution: ${e.resolution}</div>`:''}
+  </div>`).join(''):`<div class="empty-state"><div class="empty-label">No escalations</div></div>`}</div>
+  <div id="proj-notes" style="display:none">${pN.length?pN.map(n=>`<div class="note-block ${n.type==='decision'?'nb-decision':n.type==='risk'?'nb-risk':n.type==='escalation'?'nb-blocker':'nb-discussion'}"><div class="nb-label" style="color:${n.type==='decision'?'var(--green)':n.type==='risk'?'var(--red)':n.type==='escalation'?'var(--purple)':'var(--accent)'}">${n.type||'note'}</div><div style="font-size:12px;font-weight:600;margin-bottom:5px">${n.title||''}</div><div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">${n.content}</div></div>`).join(''):`<div class="empty-state"><div class="empty-label">No notes</div><button class="btn btn-primary" onclick="openNoteModal(${pid})">Add Note</button></div>`}</div>
+  <div id="proj-overview" style="display:none">
+    <div class="g2">
+      <div class="card"><div class="section-label">Project Details</div>
+        ${[['Client',p.client],['Project Manager',p.pm],['Start Date',fmtDate(p.startDate)],['End Date',fmtDate(p.endDate)],['Budget',p.budget||'—'],['Spent',p.budgetSpent||'—'],['Completion',`${p.completion||0}%`],['Priority',p.priority],['Health',p.health],['Status',p.status]].map(([k,v])=>`<div class="stat-row"><div class="stat-key">${k}</div><div class="stat-val">${v}</div></div>`).join('')}
+      </div>
+      <div><div class="card" style="margin-bottom:14px"><div class="section-label">Description</div><p style="font-size:12px;color:var(--text);line-height:1.8">${p.description||'No description.'}</p>${p.tags?.length?`<div style="margin-top:12px">${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`:''}</div>
+      <div class="card"><div class="section-label">Team</div>${[...new Set(S.tasks.filter(t=>t.projectId===pid).map(t=>t.assignedTo))].map(name=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">${avt(name,28)}<div style="font-size:12px;font-weight:500">${name}</div><span style="font-size:10px;color:var(--text3);margin-left:auto">${S.tasks.filter(t=>t.projectId===pid&&t.assignedTo===name&&t.status!=='done').length} tasks</span></div>`).join('')}</div></div>
+    </div>
+  </div>`;
+}
+
+function switchTab(tabsId,showId,clickedEl) {
+  $$(`.${tabsId.replace('-','.')} .tab, #${tabsId} .tab, [id="${tabsId}"] .tab`).forEach(t=>t.classList.remove('active'));
+  // simpler: find siblings
+  const tabs=clickedEl.closest('.tabs');
+  if(tabs) tabs.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  clickedEl.classList.add('active');
+  // hide all panes by looking at the showId prefix
+  const prefix=showId.substring(0,showId.lastIndexOf('-'));
+  $$(`[id^="${prefix}-"]`).forEach(el2=>el2.style.display='none');
+  const pane=el(showId); if(pane) pane.style.display='';
+}
+
+// ─── RENDER: TASKS ────────────────────────────────────────────────────────────
+function renderTasks() {
+  const c=el('content');
+  const overdue=S.tasks.filter(t=>isOverdue(t.dueDate,t.status));
+  const inProg=S.tasks.filter(t=>t.status==='in-progress'&&!isOverdue(t.dueDate,t.status));
+  const pending=S.tasks.filter(t=>t.status==='pending'&&!isOverdue(t.dueDate,t.status));
+  const done=S.tasks.filter(t=>t.status==='done');
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Action Items</div><div class="page-sub">${S.tasks.filter(t=>t.status!=='done').length} pending · ${overdue.length} overdue</div></div>
+    <div style="display:flex;gap:8px">
+      <select class="form-select" style="width:150px" onchange="filterTasksBy(this.value,'projectId')"><option value="">All Projects</option>${S.projects.map(p=>`<option value="${p.id}">${p.name.split(' — ')[0]}</option>`).join('')}</select>
+      <select class="form-select" style="width:130px" onchange="filterTasksBy(this.value,'assignedTo')"><option value="">All Assignees</option>${S.people.map(p=>`<option value="${p.name}">${p.name}</option>`).join('')}</select>
+      <button class="btn btn-primary" onclick="openTaskModal()">${escSvg} New Task</button>
+    </div>
+  </div>
+  ${taskGroup('⚠ Overdue',overdue,'var(--red)')}
+  ${taskGroup('In Progress',inProg,'var(--teal)')}
+  ${taskGroup('Pending',pending,'var(--amber)')}
+  ${taskGroup('Completed',done,'var(--text3)',true)}
+  ${!S.tasks.length?`<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-label">No action items yet</div><button class="btn btn-primary" onclick="openTaskModal()">Add First Task</button></div>`:''}`;
+}
+
+function taskGroup(label,tasks,color,collapsed=false) {
+  if(!tasks.length) return '';
+  return`<div style="margin-bottom:20px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:${color};margin-bottom:10px;text-transform:uppercase">${label} (${tasks.length})</div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Task</th><th>Project</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Due Date</th><th></th></tr></thead>
+    <tbody>${tasks.map(t=>{const pr=getProj(t.projectId);const over=isOverdue(t.dueDate,t.status);return`<tr>
+      <td style="font-weight:500;max-width:240px">${t.title}</td>
+      <td style="font-size:11px;color:var(--text2);max-width:150px">${pr?pr.name.split(' — ')[0]:'—'}</td>
+      <td><div style="display:flex;align-items:center;gap:6px">${avt(t.assignedTo,22)}<span style="font-size:11px">${t.assignedTo}</span></div></td>
+      <td>${priBadge(t.priority)}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td class="${over?'danger':'muted'}" style="font-size:11px">${fmtDate(t.dueDate)}${over?` <span style="font-size:9px">(${Math.abs(daysLeft(t.dueDate))}d late)</span>`:''}</td>
+      <td><div style="display:flex;gap:4px">${t.status!=='done'?`<button class="btn btn-success btn-xs" onclick="markDoneById(${t.id})">✓</button>`:''}<button class="btn btn-danger btn-xs" onclick="deleteTask(${t.id})">✕</button></div></td>
+    </tr>`;}).join('')}</tbody></table></div>
+  </div>`;
+}
+
+window.filterTasksBy = async function(val, field) {
+  await loadAll();
+  let tasks = S.tasks;
+  if(val) tasks = tasks.filter(t=>String(t[field])===String(val));
+  const overdue=tasks.filter(t=>isOverdue(t.dueDate,t.status));
+  const inProg=tasks.filter(t=>t.status==='in-progress'&&!isOverdue(t.dueDate,t.status));
+  const pending=tasks.filter(t=>t.status==='pending'&&!isOverdue(t.dueDate,t.status));
+  const done=tasks.filter(t=>t.status==='done');
+  const c=el('content');
+  const head=c.querySelector('.section-head');
+  const html=taskGroup('⚠ Overdue',overdue,'var(--red)')+taskGroup('In Progress',inProg,'var(--teal)')+taskGroup('Pending',pending,'var(--amber)')+taskGroup('Completed',done,'var(--text3)',true);
+  // replace everything after section-head
+  [...c.children].forEach(ch=>{ if(ch!==head) ch.remove(); });
+  c.insertAdjacentHTML('beforeend',html);
+};
+
+// ─── RENDER: MEETINGS ─────────────────────────────────────────────────────────
+function renderMeetings() {
+  if(S.sub) { renderMeetingDetail(S.sub); return; }
+  const c=el('content');
+  const sorted=[...S.meetings].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Meetings &amp; MOM</div><div class="page-sub">${S.meetings.length} meetings logged</div></div>
+    <div style="display:flex;gap:8px">
+      <select class="form-select" style="width:150px" onchange="filterMeetingsByProj(this.value)"><option value="">All Projects</option>${S.projects.map(p=>`<option value="${p.id}">${p.name.split(' — ')[0]}</option>`).join('')}</select>
+      <button class="btn btn-primary" onclick="openMeetingModal()">${escSvg} Log Meeting</button>
+    </div>
+  </div>
+  <div id="meeting-list">${renderMeetingList(sorted)}</div>`;
+}
+
+function renderMeetingList(meetings) {
+  return meetings.length?meetings.map(m=>{const pr=getProj(m.projectId);return`<div class="card card-hover" style="margin-bottom:10px;cursor:pointer" onclick="navigate('meetings',${m.id})">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="font-size:13px;font-weight:700">${m.title}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">${pr?pr.name:'—'} · ${fmtDate(m.date)} · ${m.attendees?.length||0} attendees</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        ${m.actionItems?.length?`<span class="badge badge-amber">${m.actionItems.length} actions</span>`:''}
+        ${m.blockers?.length?`<span class="badge badge-red">${m.blockers.length} blockers</span>`:''}
+        ${m.decisions?.length?`<span class="badge badge-green">${m.decisions.length} decisions</span>`:''}
+      </div>
+    </div>
+    ${m.decisions?.length?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text2)"><span style="color:var(--green);font-weight:700">Decisions: </span>${m.decisions.slice(0,2).join(' · ')}${m.decisions.length>2?'…':''}</div>`:''}
+    ${m.blockers?.length?`<div style="margin-top:4px;font-size:11px;color:var(--red)">⚡ ${m.blockers[0]}${m.blockers.length>1?` +${m.blockers.length-1} more`:''}</div>`:''}
+  </div>`;}).join(''):
+  `<div class="empty-state"><div class="empty-icon">◷</div><div class="empty-label">No meetings logged yet</div><button class="btn btn-primary" onclick="openMeetingModal()">Log First Meeting</button></div>`;
+}
+
+window.filterMeetingsByProj = function(val) {
+  const filtered=val?S.meetings.filter(m=>String(m.projectId)===String(val)).sort((a,b)=>new Date(b.date)-new Date(a.date)):
+    [...S.meetings].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const ml=el('meeting-list'); if(ml) ml.innerHTML=renderMeetingList(filtered);
+};
+
+function renderMeetingDetail(mid) {
+  const m=S.meetings.find(mt=>mt.id===mid); if(!m){S.sub=null;renderMeetings();return;}
+  const pr=getProj(m.projectId); const c=el('content');
+  c.innerHTML=`
+  <div style="margin-bottom:14px"><span onclick="S.sub=null;navigate('meetings')" style="font-size:12px;color:var(--accent);cursor:pointer">← All Meetings</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+    <div><div style="font-size:20px;font-weight:800;letter-spacing:-0.4px">${m.title}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${pr?pr.name:'—'} · ${fmtDate(m.date)}</div></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="exportMOM(${mid})">↓ Export MOM</button><button class="btn btn-primary btn-sm" onclick="openTaskModal(${pr?.id})">+ Follow-up Task</button></div>
+  </div>
+  <div class="meeting-split">
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="nb-label" style="color:var(--text3)">Attendees</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+          ${(m.attendees||[]).map(a=>`<div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border-radius:20px;padding:4px 10px 4px 6px">${avt(a,24)}<span style="font-size:12px">${a}</span></div>`).join('')}
+        </div>
+      </div>
+      ${m.agenda?`<div class="note-block nb-discussion"><div class="nb-label" style="color:var(--accent)">Agenda</div><p style="font-size:12px;color:var(--text);line-height:1.7">${m.agenda}</p></div>`:''}
+      ${m.discussionPoints?.length?`<div class="note-block nb-discussion"><div class="nb-label" style="color:var(--accent)">Discussion Points</div>${m.discussionPoints.map(d=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(59,130,246,0.15);color:var(--text)">• ${d}</div>`).join('')}</div>`:''}
+      ${m.decisions?.length?`<div class="note-block nb-decision"><div class="nb-label" style="color:var(--green)">Decisions Made</div>${m.decisions.map(d=>`<div style="font-size:12px;padding:5px 0;border-bottom:1px solid rgba(16,185,129,0.15);color:var(--text)">✓ ${d}</div>`).join('')}</div>`:''}
+      ${m.blockers?.length?`<div class="note-block nb-blocker"><div class="nb-label" style="color:var(--purple)">Blockers</div>${m.blockers.map(b=>`<div style="font-size:12px;padding:5px 0;border-bottom:1px solid rgba(139,92,246,0.15);color:var(--text)">⚡ ${b}</div>`).join('')}</div>`:''}
+      ${m.summary?`<div class="card"><div class="section-label">Meeting Summary</div><p style="font-size:12px;color:var(--text);line-height:1.8">${m.summary}</p></div>`:''}
+      ${m.nextSteps?`<div class="card" style="margin-top:12px"><div class="section-label">Next Steps</div><p style="font-size:12px;color:var(--text);line-height:1.8">${m.nextSteps}</p></div>`:''}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="section-label" style="color:var(--amber)">Action Items (${m.actionItems?.length||0})</div>
+        ${m.actionItems?.length?m.actionItems.map(a=>`<div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:8px;border-left:3px solid var(--amber)">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${a.title}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px">${avt(a.assignedTo,20)}<span style="font-size:11px;color:var(--text2)">${a.assignedTo}</span></div>
+          <div style="display:flex;gap:8px;margin-top:6px;align-items:center">${priBadge(a.priority)}<span style="font-size:10px;color:var(--text3)">Due ${fmtDate(a.dueDate)}</span></div>
+        </div>`).join(''):`<div style="color:var(--text3);font-size:12px">No action items</div>`}
+      </div>
+      <div class="card">
+        <div class="section-label">Tasks Created from This Meeting</div>
+        ${S.tasks.filter(t=>t.meetingId===mid).map(t=>`<div class="action-item-row">
+          <div class="ai-checkbox ${t.status==='done'?'checked':''}" onclick="${t.status!=='done'?`markDoneById(${t.id})`:''}">
+            ${t.status==='done'?`<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 5l2 2 4-4" stroke-linecap="round"/></svg>`:''}
+          </div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:500;color:${t.status==='done'?'var(--text3)':'var(--text)'};${t.status==='done'?'text-decoration:line-through':''}">${t.title}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">${t.assignedTo} · ${fmtDate(t.dueDate)}</div></div>
+          ${statusBadge(t.status)}
+        </div>`).join('')||`<div style="color:var(--text3);font-size:12px">No linked tasks</div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── RENDER: PEOPLE ───────────────────────────────────────────────────────────
+function renderPeople() {
+  const c=el('content');
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Team Directory</div><div class="page-sub">${S.people.length} team members</div></div><button class="btn btn-primary" onclick="openPersonModal()">${escSvg} New Person</button></div>
+  <div class="g-auto stagger">
+    ${S.people.map(p=>{
+      const pT=S.tasks.filter(t=>t.assignedTo===p.name&&t.status!=='done');
+      const pOT=S.tasks.filter(t=>t.assignedTo===p.name&&isOverdue(t.dueDate,t.status));
+      const pM=S.meetings.filter(m=>m.attendees?.includes(p.name));
+      return`<div class="person-card">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          ${avt(p.name,44)}
+          <div><div style="font-size:14px;font-weight:700">${p.name}</div><div style="font-size:12px;color:var(--text2)">${p.designation}</div><div style="font-size:11px;color:var(--text3)">${p.department}</div></div>
+          <div style="margin-left:auto"><span class="badge badge-gray">${p.role||p.designation?.split(' ')[0]}</span></div>
+        </div>
+        <div class="stat-row"><div class="stat-key">Email</div><div class="stat-val" style="font-size:11px;color:var(--accent)">${p.email}</div></div>
+        <div class="stat-row"><div class="stat-key">Phone</div><div class="stat-val" style="font-size:11px">${p.phone}</div></div>
+        <div class="stat-row"><div class="stat-key">Reports To</div><div class="stat-val" style="font-size:11px">${p.reportingTo}</div></div>
+        <div style="display:flex;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:800;color:${pT.length>4?'var(--red)':pT.length>2?'var(--amber)':'var(--text)'}">${pT.length}</div><div style="font-size:10px;color:var(--text3)">Pending Tasks</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:800;color:${pOT.length>0?'var(--red)':'var(--text)'}">${pOT.length}</div><div style="font-size:10px;color:var(--text3)">Overdue</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:800;color:var(--accent)">${pM.length}</div><div style="font-size:10px;color:var(--text3)">Meetings</div></div>
+        </div>
+        ${p.notes?`<div style="margin-top:10px;padding:8px;background:var(--bg3);border-radius:var(--r);font-size:11px;color:var(--text2);line-height:1.6">${p.notes}</div>`:''}
+      </div>`;
+    }).join('')}
+    ${!S.people.length?`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">◎</div><div class="empty-label">No team members yet</div><button class="btn btn-primary" onclick="openPersonModal()">Add First Person</button></div>`:''}
+  </div>`;
+}
+
+// ─── RENDER: RISKS ────────────────────────────────────────────────────────────
+function renderRisks() {
+  const c=el('content');
+  const open=S.risks.filter(r=>r.status==='open');
+  const esc=S.risks.filter(r=>r.status==='escalated');
+  const mon=S.risks.filter(r=>r.status==='monitoring');
+  const mit=S.risks.filter(r=>r.status==='mitigated');
+  const closed=S.risks.filter(r=>r.status==='closed');
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Risk Register</div><div class="page-sub">${S.risks.length} risks tracked · ${open.length+esc.length} open · ${S.risks.filter(r=>r.severity==='critical').length} critical</div></div><button class="btn btn-primary" onclick="openRiskModal()">${escSvg} New Risk</button></div>
+  <div class="g4 stagger" style="margin-bottom:18px">
+    <div class="metric-card" style="border-left:3px solid var(--red)"><div class="metric-val" style="color:var(--red)">${S.risks.filter(r=>r.severity==='critical').length}</div><div class="metric-label">Critical</div></div>
+    <div class="metric-card" style="border-left:3px solid var(--amber)"><div class="metric-val" style="color:var(--amber)">${S.risks.filter(r=>r.severity==='high').length}</div><div class="metric-label">High</div></div>
+    <div class="metric-card" style="border-left:3px solid var(--accent)"><div class="metric-val" style="color:var(--accent)">${S.risks.filter(r=>r.severity==='medium').length}</div><div class="metric-label">Medium</div></div>
+    <div class="metric-card" style="border-left:3px solid var(--green)"><div class="metric-val" style="color:var(--green)">${S.risks.filter(r=>r.severity==='low').length}</div><div class="metric-label">Low</div></div>
+  </div>
+  ${riskGroup('⚡ Escalated',esc,'var(--red)')}
+  ${riskGroup('Open',open,'var(--amber)')}
+  ${riskGroup('Monitoring',mon,'var(--accent)')}
+  ${riskGroup('Mitigated',mit,'var(--green)')}
+  ${!S.risks.length?`<div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-label">No risks tracked</div><button class="btn btn-primary" onclick="openRiskModal()">Add First Risk</button></div>`:''}`;
+}
+
+function riskGroup(label,risks,color) {
+  if(!risks.length) return '';
+  return`<div style="margin-bottom:20px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:${color};margin-bottom:10px;text-transform:uppercase">${label} (${risks.length})</div>
+    ${risks.map(r=>{const pr=getProj(r.projectId);const bc=r.severity==='critical'?'var(--red)':r.severity==='high'?'var(--amber)':r.severity==='medium'?'var(--accent)':'var(--green)';return`<div class="risk-row" style="border-left:3px solid ${bc}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <div style="flex:1;padding-right:12px">
+          <div style="font-size:13px;font-weight:700">${r.title}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">${pr?pr.name:''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:5px"><span style="color:var(--amber)">Impact:</span> ${r.impact}</div>
+          <div style="font-size:11px;color:var(--teal);margin-top:3px">↳ ${r.mitigation}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+          ${sevBadge(r.severity)} ${riskStBadge(r.status)}
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <span style="font-size:10px;color:var(--text3)">Owner: ${r.owner} · ${fmtDate(r.createdAt)}</span>
+        <div style="display:flex;gap:4px">
+          ${r.status!=='closed'?`<button class="btn btn-success btn-xs" onclick="closeRiskById(${r.id})">✓ Close</button>`:''}
+          ${r.status==='open'?`<button class="btn btn-ghost btn-xs" onclick="escalateRisk(${r.id})">Escalate</button>`:''}
+        </div>
+      </div>
+    </div>`;}).join('')}
+  </div>`;
+}
+
+// ─── RENDER: ESCALATIONS ──────────────────────────────────────────────────────
+function renderEscalations() {
+  const c=el('content');
+  const open=S.escalations.filter(e=>e.status==='open');
+  const inProg=S.escalations.filter(e=>e.status==='in-progress');
+  const resolved=S.escalations.filter(e=>e.status==='resolved'||e.status==='closed');
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Escalations</div><div class="page-sub">${S.escalations.length} total · ${open.length+inProg.length} active</div></div><button class="btn btn-primary" onclick="openEscalationModal()">${escSvg} New Escalation</button></div>
+  ${open.length+inProg.length>0?`<div class="insight-card" style="border-color:var(--red);background:var(--red-soft);margin-bottom:18px">
+    <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:8px">⚡ ESCALATIONS REQUIRING IMMEDIATE ATTENTION</div>
+    <div style="font-size:12px;color:var(--text2)">These escalations are impacting live projects. Director-level action may be required.</div>
+  </div>`:''}
+  ${escGroup('Open — Awaiting Action',open,'var(--red)')}
+  ${escGroup('In Progress — Being Handled',inProg,'var(--amber)')}
+  ${escGroup('Resolved / Closed',resolved,'var(--text3)')}
+  ${!S.escalations.length?`<div class="empty-state"><div class="empty-icon">⚡</div><div class="empty-label">No escalations raised</div><button class="btn btn-primary" onclick="openEscalationModal()">Raise Escalation</button></div>`:''}`;
+}
+
+function escGroup(label,escs,color) {
+  if(!escs.length) return '';
+  return`<div style="margin-bottom:20px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:${color};margin-bottom:10px;text-transform:uppercase">${label} (${escs.length})</div>
+    ${escs.map(e=>{const pr=getProj(e.projectId);return`<div class="risk-row" style="border-left:3px solid ${e.priority==='critical'?'var(--red)':e.priority==='high'?'var(--amber)':'var(--accent)'}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <div style="flex:1;padding-right:12px"><div style="font-size:13px;font-weight:700">${e.title}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">${pr?pr.name:''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.6">${e.description}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">${priBadge(e.priority)} ${escStBadge(e.status)}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <span style="font-size:10px;color:var(--text3)">Raised by: ${e.raisedBy} → ${e.raisedTo}</span>
+        ${e.status!=='resolved'&&e.status!=='closed'?`<button class="btn btn-success btn-xs" onclick="resolveEsc(${e.id})">Mark Resolved</button>`:''}
+      </div>
+      ${e.resolution?`<div style="font-size:11px;color:var(--green);margin-top:8px">✓ Resolution: ${e.resolution}</div>`:''}
+    </div>`;}).join('')}
+  </div>`;
+}
+
+// ─── RENDER: NOTES ────────────────────────────────────────────────────────────
+function renderNotes() {
+  const c=el('content');
+  const byType={decision:S.notes.filter(n=>n.type==='decision'),escalation:S.notes.filter(n=>n.type==='escalation'),risk:S.notes.filter(n=>n.type==='risk'),general:S.notes.filter(n=>!n.type||n.type==='general'||n.type==='quick-capture'||n.type==='daily')};
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Notes &amp; Decisions</div><div class="page-sub">${S.notes.length} notes logged</div></div>
+    <div style="display:flex;gap:8px">
+      <select class="form-select" style="width:130px" onchange="filterNotesByType(this.value)"><option value="">All Types</option><option value="decision">Decisions</option><option value="escalation">Escalations</option><option value="risk">Risk Notes</option><option value="general">General</option></select>
+      <button class="btn btn-primary" onclick="openNoteModal()">${escSvg} New Note</button>
+    </div>
+  </div>
+  <div id="notes-grid" class="g2">
+    ${Object.entries(byType).filter(([_,v])=>v.length).map(([type,notes])=>{
+      const typeColors={decision:'nb-decision',escalation:'nb-blocker',risk:'nb-risk',general:'nb-discussion'};
+      const labelColors={decision:'var(--green)',escalation:'var(--purple)',risk:'var(--red)',general:'var(--accent)'};
+      return notes.map(n=>{const pr=getProj(n.projectId);return`<div class="note-block ${typeColors[type]||'nb-discussion'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div class="nb-label" style="color:${labelColors[type]}">${n.type||'note'}</div>
+          <span style="font-size:10px;color:var(--text3)">${fmtDate(new Date(n.createdAt).toISOString().split('T')[0])}</span>
+        </div>
+        ${pr?`<div style="font-size:10px;color:var(--accent);margin-bottom:5px">${pr.name}</div>`:''}
+        ${n.title?`<div style="font-size:13px;font-weight:700;margin-bottom:6px">${n.title}</div>`:''}
+        <div style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap">${n.content}</div>
+      </div>`;}).join('');
+    }).join('')}
+    ${!S.notes.length?`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">≡</div><div class="empty-label">No notes yet</div><button class="btn btn-primary" onclick="openNoteModal()">Add First Note</button></div>`:''}
+  </div>`;
+}
+
+window.filterNotesByType = function(type) {
+  const filtered=type?S.notes.filter(n=>n.type===type):S.notes;
+  // re-render just the grid
+  const g=el('notes-grid');
+  if(!g) return;
+  const typeColors={decision:'nb-decision',escalation:'nb-blocker',risk:'nb-risk',general:'nb-discussion','quick-capture':'nb-discussion',daily:'nb-discussion'};
+  const labelColors={decision:'var(--green)',escalation:'var(--purple)',risk:'var(--red)',general:'var(--accent)','quick-capture':'var(--accent)',daily:'var(--teal)'};
+  g.innerHTML=filtered.map(n=>{const pr=getProj(n.projectId);const t=n.type||'general';return`<div class="note-block ${typeColors[t]||'nb-discussion'}"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><div class="nb-label" style="color:${labelColors[t]||'var(--accent)'}">${t}</div><span style="font-size:10px;color:var(--text3)">${fmtDate(new Date(n.createdAt).toISOString().split('T')[0])}</span></div>${pr?`<div style="font-size:10px;color:var(--accent);margin-bottom:5px">${pr.name}</div>`:''}<div style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap">${n.title?`<strong>${n.title}</strong>\n`:''} ${n.content}</div></div>`;}).join('');
+};
+
+// ─── RENDER: INSIGHTS ─────────────────────────────────────────────────────────
+function renderInsights() {
+  const c=el('content');
+  const workload={};
+  S.tasks.filter(t=>t.status!=='done').forEach(t=>{ workload[t.assignedTo]=(workload[t.assignedTo]||0)+1; });
+  const topBusy=Object.entries(workload).sort((a,b)=>b[1]-a[1]);
+  const overdueByProj={};
+  S.tasks.filter(t=>isOverdue(t.dueDate,t.status)).forEach(t=>{const pr=getProj(t.projectId);const n=pr?pr.name:'Unknown'; overdueByProj[n]=(overdueByProj[n]||0)+1;});
+  const mostDelayed=Object.entries(overdueByProj).sort((a,b)=>b[1]-a[1])[0];
+  const blockers=S.meetings.flatMap(m=>m.blockers||[]).slice(0,5);
+  const critRisks=S.risks.filter(r=>r.severity==='critical'&&r.status!=='closed');
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">PMO Insights</div><div class="page-sub">AI-generated intelligence snapshot</div></div></div>
+  <div class="g2" style="margin-bottom:16px">
+    <div class="insight-card" style="border-color:var(--red)">
+      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:8px">⚡ CRITICAL RISKS — DIRECTOR ACTION NEEDED</div>
+      ${critRisks.length?critRisks.map(r=>{const pr=getProj(r.projectId);return`<div style="padding:8px 0;border-bottom:1px solid rgba(239,68,68,0.15)"><div style="font-size:12px;font-weight:600">${r.title}</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${pr?pr.name:''}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">↳ ${r.mitigation}</div></div>`;}).join(''):`<div style="font-size:12px;color:var(--green)">✓ No critical open risks</div>`}
+    </div>
+    <div class="insight-card" style="border-color:var(--amber)">
+      <div style="font-size:11px;font-weight:700;color:var(--amber);letter-spacing:1px;margin-bottom:8px">⚠ RESOURCE OVERLOAD SIGNALS</div>
+      ${topBusy.map(([name,count])=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(245,158,11,0.15)">
+        ${avt(name,28)}<div style="flex:1"><div style="font-size:12px;font-weight:600">${name}</div><div style="font-size:10px;color:var(--text3)">${S.tasks.filter(t=>t.assignedTo===name&&isOverdue(t.dueDate,t.status)).length} overdue tasks</div></div>
+        <span style="font-size:14px;font-weight:800;color:${count>=5?'var(--red)':'var(--amber)'}">${count}</span>
+      </div>`).join('')||`<div style="font-size:12px;color:var(--green)">✓ Team is balanced</div>`}
+    </div>
+  </div>
+  <div class="g2" style="margin-bottom:16px">
+    <div class="insight-card" style="border-color:var(--purple)">
+      <div style="font-size:11px;font-weight:700;color:var(--purple);letter-spacing:1px;margin-bottom:8px">📋 FREQUENT MEETING BLOCKERS</div>
+      ${blockers.length?blockers.map(b=>`<div style="padding:6px 0;border-bottom:1px solid rgba(139,92,246,0.15);font-size:12px;color:var(--text)">⚡ ${b}</div>`).join(''):`<div style="font-size:12px;color:var(--green)">✓ No recurring blockers detected</div>`}
+    </div>
+    <div class="insight-card" style="border-color:var(--teal)">
+      <div style="font-size:11px;font-weight:700;color:var(--teal);letter-spacing:1px;margin-bottom:8px">📊 PROJECT COMPLETION STATUS</div>
+      ${S.projects.map(p=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:12px;color:var(--text)">${p.name.split(' — ')[0]}</span><span style="font-size:11px;color:var(--text3)">${p.completion||0}%</span></div><div class="progress"><div class="progress-fill" style="width:${p.completion||0}%;background:${p.health==='critical'?'var(--red)':p.health==='at-risk'?'var(--amber)':'var(--accent)'}"></div></div></div>`).join('')}
+    </div>
+  </div>
+  <div class="g3">
+    <div class="card"><div class="section-label">Decisions Made This Month</div><div style="font-size:32px;font-weight:800;color:var(--accent);font-family:var(--font-mono)">${S.decisions.length}</div><div style="font-size:12px;color:var(--text2);margin-top:6px">Across ${[...new Set(S.decisions.map(d=>d.projectId))].length} projects</div></div>
+    <div class="card"><div class="section-label">Meetings This Month</div><div style="font-size:32px;font-weight:800;color:var(--purple);font-family:var(--font-mono)">${S.meetings.length}</div><div style="font-size:12px;color:var(--text2);margin-top:6px">${S.meetings.reduce((a,m)=>a+(m.actionItems?.length||0),0)} total action items generated</div></div>
+    <div class="card"><div class="section-label">Most Impacted Project</div><div style="font-size:14px;font-weight:700;color:var(--red);margin-top:6px">${mostDelayed?mostDelayed[0]:'All clear'}</div><div style="font-size:12px;color:var(--text2);margin-top:4px">${mostDelayed?mostDelayed[1]+' overdue tasks':'No overdue tasks'}</div></div>
+  </div>`;
+}
+
+// ─── RENDER: REPORTS ──────────────────────────────────────────────────────────
+function renderReports() {
+  const c=el('content');
+  const reports=[
+    {icon:'📊',title:'Weekly Status Report',desc:'Project health, overdue tasks, risks, and team workload for all active projects',color:'var(--accent)',fn:'exportWeekly'},
+    {icon:'📋',title:'Minutes of Meeting (All)',desc:'All meeting records with agenda, decisions, blockers, and action items',color:'var(--purple)',fn:'exportAllMOM'},
+    {icon:'⚠',title:'Risk Register Report',desc:'Full risk register — severity, impact, mitigation, owner, status',color:'var(--red)',fn:'exportRisks'},
+    {icon:'✓',title:'Action Item Tracker',desc:'All pending, overdue, and completed tasks with owners and due dates',color:'var(--amber)',fn:'exportTasks'},
+    {icon:'👥',title:'Resource Allocation',desc:'Team workload, task distribution, and project assignments per person',color:'var(--teal)',fn:'exportResources'},
+    {icon:'⚡',title:'Escalation Report',desc:'All escalations raised, their status, and resolution notes',color:'var(--pink)',fn:'exportEscalations'},
+    {icon:'📌',title:'Decisions Log',desc:'All decisions made across projects with rationale and impact area',color:'var(--green)',fn:'exportDecisions'},
+    {icon:'🗂',title:'Full PMO Export',desc:'Complete database export — all projects, tasks, risks, meetings, people',color:'var(--text)',fn:'exportAll'},
+  ];
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Reports &amp; Export</div><div class="page-sub">Export PMO data to Excel workbooks</div></div></div>
+  <div class="g-auto stagger">
+    ${reports.map(r=>`<div class="card card-hover" style="cursor:pointer;border-top:3px solid ${r.color}" onclick="${r.fn}()">
+      <div style="font-size:28px;margin-bottom:12px">${r.icon}</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">${r.title}</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.7;margin-bottom:14px">${r.desc}</div>
+      <div style="font-size:11px;color:${r.color};font-weight:700">↓ Export to Excel</div>
+    </div>`).join('')}
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="section-label">Backup &amp; Restore</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="exportBackup()">↓ Export Full Backup (JSON)</button>
+      <button class="btn btn-ghost" onclick="el('restore-file').click()">↑ Restore from Backup</button>
+      <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup(this)">
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:10px">Backup exports all data as JSON. Restore will merge/overwrite existing data.</div>
+  </div>`;
+}
+
+// ─── RENDER: ACTIVITY ─────────────────────────────────────────────────────────
+function renderActivity() {
+  const c=el('content');
+  const logs=[...S.activityLog].sort((a,b)=>b.createdAt-a.createdAt);
+  const typeIcons={meeting:'◷',task:'✓',risk:'⚠',note:'≡',project:'▦',escalation:'⚡'};
+  const typeColors={meeting:'var(--purple)',task:'var(--green)',risk:'var(--red)',note:'var(--accent)',project:'var(--teal)',escalation:'var(--pink)'};
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Activity Log</div><div class="page-sub">Full audit trail of PMO actions</div></div></div>
+  <div class="card">
+    ${logs.length?logs.map(l=>`<div class="timeline-item">
+      <div class="timeline-line">
+        <div class="timeline-dot" style="border-color:${typeColors[l.type]||'var(--accent)'}"></div>
+        <div class="timeline-connector"></div>
+      </div>
+      <div class="timeline-content">
+        <div style="font-size:10px;color:var(--text3)">${new Date(l.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+          <span style="font-size:12px;color:${typeColors[l.type]||'var(--accent)'}">${typeIcons[l.type]||'·'}</span>
+          <div style="font-size:12px;font-weight:500;color:var(--text)">${l.action}</div>
+        </div>
+        ${l.user?`<div style="font-size:10px;color:var(--text3);margin-top:2px">by ${l.user}</div>`:''}
+      </div>
+    </div>`).join(''):`<div class="empty-state"><div class="empty-label">No activity logged yet</div></div>`}
+  </div>`;
+}
+
+// ─── RENDER: SETTINGS ─────────────────────────────────────────────────────────
+function renderSettings() {
+  const c=el('content');
+  c.innerHTML=`
+  <div class="section-head"><div><div class="page-title">Settings &amp; Backup</div><div class="page-sub">Configure your PMO workspace</div></div></div>
+  <div class="g2">
+    <div class="card">
+      <div class="section-label">Workspace Info</div>
+      <div class="stat-row"><div class="stat-key">Projects</div><div class="stat-val">${S.projects.length}</div></div>
+      <div class="stat-row"><div class="stat-key">People</div><div class="stat-val">${S.people.length}</div></div>
+      <div class="stat-row"><div class="stat-key">Meetings</div><div class="stat-val">${S.meetings.length}</div></div>
+      <div class="stat-row"><div class="stat-key">Tasks</div><div class="stat-val">${S.tasks.length}</div></div>
+      <div class="stat-row"><div class="stat-key">Risks</div><div class="stat-val">${S.risks.length}</div></div>
+      <div class="stat-row"><div class="stat-key">Notes</div><div class="stat-val">${S.notes.length}</div></div>
+      <div class="stat-row"><div class="stat-key">Storage</div><div class="stat-val">IndexedDB · Local</div></div>
+    </div>
+    <div class="card">
+      <div class="section-label">Data Management</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-ghost" onclick="exportBackup()">↓ Export Full Backup (JSON)</button>
+        <button class="btn btn-ghost" onclick="exportAll()">↓ Export All Data (Excel)</button>
+        <button class="btn btn-ghost" onclick="el('restore-file2').click()">↑ Restore from JSON Backup</button>
+        <input type="file" id="restore-file2" accept=".json" style="display:none" onchange="restoreBackup(this)">
+        <hr style="border-color:var(--border)">
+        <button class="btn btn-danger" onclick="clearAllData()">⚠ Clear All Data (Irreversible)</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function openModal(html) { el('modal-root').innerHTML=html; }
+function closeModal() { el('modal-root').innerHTML=''; }
+
+const closeX = `<button class="close-btn" onclick="closeModal()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg></button>`;
+const overlay = (inner) => `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">${inner}</div>`;
+
+function openProjectModal() {
+  const ppl=S.people.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  openModal(overlay(`<div class="modal fade-up">
+    <div class="modal-hdr"><span class="modal-title">New Project</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-row"><div class="form-group"><label class="form-label">Project Name *</label><input class="form-input" id="fp-name" placeholder="ERP Migration — Client Corp"></div><div class="form-group"><label class="form-label">Client *</label><input class="form-input" id="fp-client" placeholder="Client name"></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Project Manager</label><select class="form-select" id="fp-pm"><option value="">Select PM...</option>${ppl}</select></div><div class="form-group"><label class="form-label">Priority</label><select class="form-select" id="fp-pri"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Start Date</label><input class="form-input" id="fp-start" type="date"></div><div class="form-group"><label class="form-label">End Date</label><input class="form-input" id="fp-end" type="date"></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Status</label><select class="form-select" id="fp-st"><option value="active">Active</option><option value="on-hold">On Hold</option><option value="completed">Completed</option></select></div><div class="form-group"><label class="form-label">Health</label><select class="form-select" id="fp-health"><option value="healthy">Healthy</option><option value="at-risk">At Risk</option><option value="delayed">Delayed</option><option value="critical">Critical</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Budget</label><input class="form-input" id="fp-budget" placeholder="₹1.5Cr"></div><div class="form-group"><label class="form-label">Completion %</label><input class="form-input" id="fp-comp" type="number" min="0" max="100" placeholder="0"></div></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="fp-desc" placeholder="Project description..."></textarea></div>
+      <div class="form-group"><label class="form-label">Tags (comma separated)</label><input class="form-input" id="fp-tags" placeholder="#erp, #migration, #critical"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Create Project</button></div>
+  </div>`));
+}
+
+async function saveProject() {
+  const name=el('fp-name').value.trim(); const client=el('fp-client').value.trim();
+  if(!name||!client){toast('Name and client required','error');return;}
+  const id=await db.projects.add({name,client,pm:el('fp-pm').value||'Unassigned',priority:el('fp-pri').value,status:el('fp-st').value,health:el('fp-health').value,startDate:el('fp-start').value,endDate:el('fp-end').value,budget:el('fp-budget').value,completion:parseInt(el('fp-comp').value)||0,description:el('fp-desc').value,tags:el('fp-tags').value.split(',').map(s=>s.trim()).filter(Boolean),createdAt:Date.now()});
+  await db.activityLog.add({type:'project',action:`Project created: ${name}`,user:'PMO',createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Project created'); navigate('projects',id);
+}
+
+function openTaskModal(projectId) {
+  const projOpts=S.projects.map(p=>`<option value="${p.id}" ${p.id===projectId?'selected':''}>${p.name}</option>`).join('');
+  const pplOpts=S.people.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  openModal(overlay(`<div class="modal fade-up">
+    <div class="modal-hdr"><span class="modal-title">New Action Item</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Task Title *</label><input class="form-input" id="ft-title" placeholder="What needs to be done?"></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Project</label><select class="form-select" id="ft-proj"><option value="">None</option>${projOpts}</select></div><div class="form-group"><label class="form-label">Assigned To *</label><select class="form-select" id="ft-assign"><option value="">Select person...</option>${pplOpts}</select></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Priority</label><select class="form-select" id="ft-pri"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div><div class="form-group"><label class="form-label">Due Date</label><input class="form-input" id="ft-due" type="date"></div></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="ft-desc" placeholder="Details and context..."></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveTask()">Create Task</button></div>
+  </div>`));
+}
+
+async function saveTask() {
+  const title=el('ft-title').value.trim(); if(!title){toast('Title required','error');return;}
+  const pid=parseInt(el('ft-proj').value)||null;
+  await db.tasks.add({title,projectId:pid,assignedTo:el('ft-assign').value||'Unassigned',priority:el('ft-pri').value,status:'pending',dueDate:el('ft-due').value,description:el('ft-desc').value,createdBy:'PMO',createdAt:Date.now()});
+  await db.activityLog.add({type:'task',action:`Task created: ${title}`,user:'PMO',createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Task created'); navigate(S.page);
+}
+
+function openMeetingModal(projectId) {
+  const projOpts=S.projects.map(p=>`<option value="${p.id}" ${p.id===projectId?'selected':''}>${p.name}</option>`).join('');
+  openModal(overlay(`<div class="modal modal-lg fade-up">
+    <div class="modal-hdr"><span class="modal-title">Log Meeting &amp; MOM</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-row"><div class="form-group"><label class="form-label">Meeting Title *</label><input class="form-input" id="fm-title" placeholder="Sprint Review, Steering Committee, UAT Kickoff..."></div><div class="form-group"><label class="form-label">Date</label><input class="form-input" id="fm-date" type="date" value="${new Date().toISOString().split('T')[0]}"></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Project</label><select class="form-select" id="fm-proj"><option value="">None</option>${projOpts}</select></div><div class="form-group"><label class="form-label">Attendees (comma-separated)</label><input class="form-input" id="fm-att" placeholder="Priya Nair, Ravi Kumar, Client PM..."></div></div>
+      <div class="form-group"><label class="form-label">Agenda</label><textarea class="form-textarea" id="fm-agenda" placeholder="Meeting agenda and objectives..." style="min-height:56px"></textarea></div>
+      <div class="form-group"><label class="form-label">Discussion Points (one per line)</label><textarea class="form-textarea" id="fm-disc" placeholder="API integration delayed&#10;Client requested new feature&#10;UAT environment not ready" style="min-height:80px"></textarea></div>
+      <div class="form-group"><label class="form-label">Decisions Made (one per line)</label><textarea class="form-textarea" id="fm-dec" placeholder="Extend sprint by 1 week&#10;Dashboard scope change approved&#10;Go-live pushed to July 1" style="min-height:70px"></textarea></div>
+      <div class="form-group"><label class="form-label">Blockers (one per line)</label><textarea class="form-textarea" id="fm-block" placeholder="Firewall blocking test environment&#10;Vendor data not received"></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Action Items</label>
+        <div class="form-hint" style="margin-bottom:6px">Format: Person → Task → Due Date (YYYY-MM-DD) — one per line</div>
+        <textarea class="form-textarea" id="fm-actions" placeholder="Ravi Kumar → Fix API auth module → 2026-05-24&#10;Priya Nair → Send scope change doc → 2026-05-22" style="min-height:80px"></textarea>
+      </div>
+      <div class="form-group"><label class="form-label">Next Steps</label><textarea class="form-textarea" id="fm-next" placeholder="Next review May 28. Client call May 22..." style="min-height:48px"></textarea></div>
+      <div class="form-group"><label class="form-label">Summary</label><textarea class="form-textarea" id="fm-sum" placeholder="Overall meeting summary for stakeholders..."></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveMeeting()">Log Meeting + Create Tasks</button></div>
+  </div>`));
+}
+
+async function saveMeeting() {
+  const title=el('fm-title').value.trim(); if(!title){toast('Title required','error');return;}
+  const pid=parseInt(el('fm-proj').value)||null;
+  const actionLines=el('fm-actions').value.split('\n').filter(l=>l.trim());
+  const actionItems=actionLines.map(l=>{const p=l.split('→').map(s=>s.trim()); return{assignedTo:p[0]||'TBD',title:p[1]||l,dueDate:p[2]||'',priority:'high'};});
+  const mid=await db.meetings.add({projectId:pid,title,date:el('fm-date').value,attendees:el('fm-att').value.split(',').map(s=>s.trim()).filter(Boolean),agenda:el('fm-agenda').value,discussionPoints:el('fm-disc').value.split('\n').filter(l=>l.trim()),decisions:el('fm-dec').value.split('\n').filter(l=>l.trim()),blockers:el('fm-block').value.split('\n').filter(l=>l.trim()),actionItems,nextSteps:el('fm-next').value,summary:el('fm-sum').value,createdAt:Date.now()});
+  for(const ai of actionItems) {
+    if(ai.title) await db.tasks.add({title:ai.title,assignedTo:ai.assignedTo,projectId:pid,description:`From meeting: ${title}`,priority:'high',status:'pending',dueDate:ai.dueDate,createdBy:'Meeting',meetingId:mid,createdAt:Date.now()});
+  }
+  await db.activityLog.add({type:'meeting',action:`Meeting logged: ${title}`,user:'PMO',createdAt:Date.now()});
+  closeModal(); await loadAll(); toast(`Meeting logged · ${actionItems.length} tasks auto-created`,'success'); navigate('meetings',mid);
+}
+
+function openPersonModal() {
+  openModal(overlay(`<div class="modal fade-up">
+    <div class="modal-hdr"><span class="modal-title">Add Team Member</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-row"><div class="form-group"><label class="form-label">Full Name *</label><input class="form-input" id="fper-name" placeholder="Priya Nair"></div><div class="form-group"><label class="form-label">Designation</label><input class="form-input" id="fper-desig" placeholder="Senior PM, Tech Lead..."></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Department</label><input class="form-input" id="fper-dept" placeholder="PMO, Engineering, QA..."></div><div class="form-group"><label class="form-label">Role</label><select class="form-select" id="fper-role"><option>PM</option><option>Tech Lead</option><option>BA</option><option>QA</option><option>DevOps</option><option>Director</option><option>Stakeholder</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Email</label><input class="form-input" id="fper-email" type="email" placeholder="name@company.in"></div><div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="fper-phone" placeholder="+91-98765-00000"></div></div>
+      <div class="form-group"><label class="form-label">Reporting To</label><input class="form-input" id="fper-reports" placeholder="Director PMO"></div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="fper-notes" placeholder="Key responsibilities, strengths, context..."></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePerson()">Add Member</button></div>
+  </div>`));
+}
+
+async function savePerson() {
+  const name=el('fper-name').value.trim(); if(!name){toast('Name required','error');return;}
+  await db.people.add({name,designation:el('fper-desig').value,department:el('fper-dept').value,role:el('fper-role').value,email:el('fper-email').value,phone:el('fper-phone').value,reportingTo:el('fper-reports').value,notes:el('fper-notes').value,createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Team member added'); navigate('people');
+}
+
+function openRiskModal(projectId) {
+  const projOpts=S.projects.map(p=>`<option value="${p.id}" ${p.id===projectId?'selected':''}>${p.name}</option>`).join('');
+  const pplOpts=S.people.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  openModal(overlay(`<div class="modal fade-up">
+    <div class="modal-hdr"><span class="modal-title">Log Risk</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Risk Title *</label><input class="form-input" id="fr-title" placeholder="API integration delay cascades into UAT timeline"></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Project</label><select class="form-select" id="fr-proj"><option value="">None</option>${projOpts}</select></div><div class="form-group"><label class="form-label">Severity</label><select class="form-select" id="fr-sev"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div></div>
+      <div class="form-group"><label class="form-label">Impact</label><textarea class="form-textarea" id="fr-impact" placeholder="Timeline delayed by X weeks, cost overrun of ₹Y, regulatory non-compliance..." style="min-height:60px"></textarea></div>
+      <div class="form-group"><label class="form-label">Mitigation Plan</label><textarea class="form-textarea" id="fr-mit" placeholder="How will this risk be mitigated?" style="min-height:60px"></textarea></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Owner</label><select class="form-select" id="fr-owner"><option value="">Select owner...</option>${pplOpts}</select></div><div class="form-group"><label class="form-label">Status</label><select class="form-select" id="fr-st"><option value="open">Open</option><option value="escalated">Escalated</option><option value="monitoring">Monitoring</option><option value="mitigated">Mitigated</option></select></div></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveRisk()">Log Risk</button></div>
+  </div>`));
+}
+
+async function saveRisk() {
+  const title=el('fr-title').value.trim(); if(!title){toast('Title required','error');return;}
+  await db.risks.add({title,projectId:parseInt(el('fr-proj').value)||null,severity:el('fr-sev').value,impact:el('fr-impact').value,mitigation:el('fr-mit').value,owner:el('fr-owner').value,status:el('fr-st').value,createdAt:Date.now()});
+  await db.activityLog.add({type:'risk',action:`Risk logged: ${title}`,user:'PMO',createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Risk logged'); navigate(S.page);
+}
+
+function openEscalationModal(projectId) {
+  const projOpts=S.projects.map(p=>`<option value="${p.id}" ${p.id===projectId?'selected':''}>${p.name}</option>`).join('');
+  const pplOpts=S.people.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  openModal(overlay(`<div class="modal fade-up">
+    <div class="modal-hdr"><span class="modal-title">Raise Escalation</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Escalation Title *</label><input class="form-input" id="fe-title" placeholder="What is being escalated?"></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Project</label><select class="form-select" id="fe-proj"><option value="">None</option>${projOpts}</select></div><div class="form-group"><label class="form-label">Priority</label><select class="form-select" id="fe-pri"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option></select></div></div>
+      <div class="form-group"><label class="form-label">Description *</label><textarea class="form-textarea" id="fe-desc" placeholder="Full context — why is this being escalated, what has been tried, what decision is needed?" style="min-height:80px"></textarea></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Raised By</label><select class="form-select" id="fe-by"><option value="">Select...</option>${pplOpts}</select></div><div class="form-group"><label class="form-label">Raised To</label><input class="form-input" id="fe-to" placeholder="Director PMO, Client CTO..."></div></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEscalation()">Raise Escalation</button></div>
+  </div>`));
+}
+
+async function saveEscalation() {
+  const title=el('fe-title').value.trim(); const desc=el('fe-desc').value.trim();
+  if(!title||!desc){toast('Title and description required','error');return;}
+  await db.escalations.add({title,description:desc,projectId:parseInt(el('fe-proj').value)||null,priority:el('fe-pri').value,raisedBy:el('fe-by').value,raisedTo:el('fe-to').value,status:'open',resolution:'',createdAt:Date.now()});
+  await db.activityLog.add({type:'escalation',action:`Escalation raised: ${title}`,user:el('fe-by').value||'PMO',createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Escalation raised'); navigate('escalations');
+}
+
+function openNoteModal(projectId) {
+  const projOpts=S.projects.map(p=>`<option value="${p.id}" ${p.id===projectId?'selected':''}>${p.name}</option>`).join('');
+  openModal(overlay(`<div class="modal fade-up">
+    <div class="modal-hdr"><span class="modal-title">New Note</span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-row"><div class="form-group"><label class="form-label">Type</label><select class="form-select" id="fn-type"><option value="general">General</option><option value="decision">Decision</option><option value="escalation">Escalation</option><option value="risk">Risk Note</option></select></div><div class="form-group"><label class="form-label">Project</label><select class="form-select" id="fn-proj"><option value="">None</option>${projOpts}</select></div></div>
+      <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="fn-title" placeholder="Note title (optional)"></div>
+      <div class="form-group"><label class="form-label">Content *</label><textarea class="form-textarea" id="fn-content" placeholder="Note content..." style="min-height:120px"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNote()">Save Note</button></div>
+  </div>`));
+}
+
+async function saveNote() {
+  const content=el('fn-content').value.trim(); if(!content){toast('Content required','error');return;}
+  await db.notes.add({type:el('fn-type').value,projectId:parseInt(el('fn-proj').value)||null,title:el('fn-title').value,content,createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Note saved'); navigate(S.page);
+}
+
+function openQuickCapture() {
+  openModal(overlay(`<div class="modal fade-up" style="width:480px">
+    <div class="modal-hdr"><span class="modal-title">⚡ Quick Capture</span><span style="font-size:10px;color:var(--text3)"><kbd>Ctrl+Shift+N</kbd></span>${closeX}</div>
+    <div class="modal-body">
+      <div class="form-group"><textarea class="form-textarea" id="qc-text" placeholder="Type anything — note, decision, follow-up, idea, risk..." style="min-height:100px" autofocus></textarea></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal();openTaskModal()">→ Task</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal();openMeetingModal()">→ Meeting</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal();openRiskModal()">→ Risk</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal();openEscalationModal()">→ Escalation</button>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveQuickCapture()">Save Note</button></div>
+  </div>`));
+  setTimeout(()=>{const t=el('qc-text');if(t)t.focus();},80);
+}
+
+async function saveQuickCapture() {
+  const content=el('qc-text')?.value?.trim(); if(!content) return;
+  await db.notes.add({type:'quick-capture',content,createdAt:Date.now()});
+  closeModal(); await loadAll(); toast('Captured!');
+}
+
+// ─── ACTIONS ──────────────────────────────────────────────────────────────────
+window.markDone = async function(id, checkEl) {
+  checkEl.classList.add('checked');
+  checkEl.innerHTML=`<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 5l2 2 4-4" stroke-linecap="round"/></svg>`;
+  await db.tasks.update(id,{status:'done'});
+  await db.activityLog.add({type:'task',action:'Task completed',user:'PMO',createdAt:Date.now()});
+  await loadAll(); toast('Task completed','success'); updateBadges();
+};
+
+window.markDoneById = async function(id) {
+  await db.tasks.update(id,{status:'done'});
+  await db.activityLog.add({type:'task',action:'Task completed',user:'PMO',createdAt:Date.now()});
+  await loadAll(); toast('Task completed','success'); navigate(S.page, S.sub);
+};
+
+window.deleteTask = async function(id) {
+  await db.tasks.delete(id); await loadAll(); toast('Task deleted'); navigate(S.page,S.sub);
+};
+
+window.closeRiskById = async function(id) {
+  await db.risks.update(id,{status:'closed'}); await loadAll(); toast('Risk closed'); navigate(S.page,S.sub);
+};
+
+window.escalateRisk = async function(id) {
+  await db.risks.update(id,{status:'escalated'}); await loadAll(); toast('Risk escalated','info'); navigate(S.page,S.sub);
+};
+
+window.resolveEsc = async function(id) {
+  const res=prompt('Resolution notes (optional):');
+  await db.escalations.update(id,{status:'resolved',resolution:res||'Resolved'});
+  await db.activityLog.add({type:'escalation',action:'Escalation resolved',user:'PMO',createdAt:Date.now()});
+  await loadAll(); toast('Escalation resolved'); navigate('escalations');
+};
+
+async function clearAllData() {
+  if(!confirm('This will delete ALL data permanently. Are you sure?')) return;
+  await Promise.all([db.projects.clear(),db.people.clear(),db.meetings.clear(),db.tasks.clear(),db.notes.clear(),db.risks.clear(),db.escalations.clear(),db.decisions.clear(),db.activityLog.clear()]);
+  await seed(); await loadAll(); toast('Workspace reset'); navigate('dashboard');
+}
+
+// ─── EXPORTS ──────────────────────────────────────────────────────────────────
+function xlsxSheet(data) { return XLSX.utils.aoa_to_sheet(data); }
+function xlsxDownload(wb, name) { XLSX.writeFile(wb, `${name}_${new Date().toISOString().split('T')[0]}.xlsx`); }
+
+window.exportAll = function() {
+  const wb=XLSX.utils.book_new();
+  // Projects
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Name','Client','PM','Status','Health','Priority','Budget','Spent','Completion%','Start','End','Description'],...S.projects.map(p=>[p.name,p.client,p.pm,p.status,p.health,p.priority,p.budget||'',p.budgetSpent||'',p.completion||0,p.startDate,p.endDate,p.description])]),'Projects');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Task','Project','Assignee','Priority','Status','Due Date','Description'],...S.tasks.map(t=>[t.title,getProj(t.projectId)?.name||'',t.assignedTo,t.priority,t.status,t.dueDate,t.description])]),'Action Items');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Title','Project','Severity','Status','Impact','Mitigation','Owner'],...S.risks.map(r=>[r.title,getProj(r.projectId)?.name||'',r.severity,r.status,r.impact,r.mitigation,r.owner])]),'Risks');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Title','Project','Date','Attendees','Discussion','Decisions','Blockers','Actions'],...S.meetings.map(m=>[m.title,getProj(m.projectId)?.name||'',m.date,(m.attendees||[]).join('; '),(m.discussionPoints||[]).join('; '),(m.decisions||[]).join('; '),(m.blockers||[]).join('; '),(m.actionItems||[]).map(a=>`${a.assignedTo}: ${a.title}`).join('; ')])]),'Meetings');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Name','Designation','Department','Role','Email','Phone','Reports To'],...S.people.map(p=>[p.name,p.designation,p.department,p.role,p.email,p.phone,p.reportingTo])]),'Team');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Title','Project','Raised By','Raised To','Priority','Status','Resolution'],...S.escalations.map(e=>[e.title,getProj(e.projectId)?.name||'',e.raisedBy,e.raisedTo,e.priority,e.status,e.resolution])]),'Escalations');
+  xlsxDownload(wb,'PMO_Full_Export'); toast('Full export downloaded','success');
+};
+
+window.exportProject = function(pid) {
+  const p=getProj(pid); if(!p) return;
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Field','Value'],['Name',p.name],['Client',p.client],['PM',p.pm],['Status',p.status],['Health',p.health],['Priority',p.priority],['Budget',p.budget||''],['Completion',`${p.completion||0}%`],['Start',p.startDate],['End',p.endDate]]),'Overview');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Task','Assignee','Priority','Status','Due Date'],...S.tasks.filter(t=>t.projectId===pid).map(t=>[t.title,t.assignedTo,t.priority,t.status,t.dueDate])]),'Tasks');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Risk','Severity','Status','Impact','Mitigation','Owner'],...S.risks.filter(r=>r.projectId===pid).map(r=>[r.title,r.severity,r.status,r.impact,r.mitigation,r.owner])]),'Risks');
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Meeting','Date','Attendees','Decisions','Action Items'],...S.meetings.filter(m=>m.projectId===pid).map(m=>[m.title,m.date,(m.attendees||[]).join('; '),(m.decisions||[]).join('; '),(m.actionItems||[]).map(a=>`${a.assignedTo}: ${a.title}`).join('; ')])]),'Meetings');
+  xlsxDownload(wb,p.name.replace(/[^a-z0-9]/gi,'_')); toast('Project exported');
+};
+
+window.exportMOM = function(mid) {
+  const m=S.meetings.find(mt=>mt.id===mid); if(!m) return;
+  const pr=getProj(m.projectId);
+  const wb=XLSX.utils.book_new();
+  const data=[['MINUTES OF MEETING'],[''],['Title',m.title],['Project',pr?pr.name:'—'],['Date',fmtDate(m.date)],['Attendees',(m.attendees||[]).join(', ')],[''],['AGENDA'],[m.agenda||''],[''],['DISCUSSION POINTS'],...(m.discussionPoints||[]).map(d=>['•',d]),[''],['DECISIONS MADE'],...(m.decisions||[]).map(d=>['✓',d]),[''],['BLOCKERS'],...(m.blockers||[]).map(b=>['⚡',b]),[''],['ACTION ITEMS'],['Assigned To','Task','Due Date'],...(m.actionItems||[]).map(a=>[a.assignedTo,a.title,a.dueDate||'']),[''],['NEXT STEPS'],[m.nextSteps||''],[''],['SUMMARY'],[m.summary||'']];
+  XLSX.utils.book_append_sheet(wb,xlsxSheet(data),'MOM');
+  xlsxDownload(wb,`MOM_${m.title.replace(/[^a-z0-9]/gi,'_')}`); toast('MOM exported');
+};
+
+window.exportWeekly = function() {
+  const wb=XLSX.utils.book_new();
+  const data=[['WEEKLY PMO STATUS REPORT'],['Generated:',new Date().toLocaleDateString('en-IN')],[''],['PROJECT STATUS'],['Project','Client','PM','Health','Status','Priority','Open Tasks','Overdue','Open Risks'],...S.projects.map(p=>[p.name,p.client,p.pm,p.health,p.status,p.priority,S.tasks.filter(t=>t.projectId===p.id&&t.status!=='done').length,S.tasks.filter(t=>t.projectId===p.id&&isOverdue(t.dueDate,t.status)).length,S.risks.filter(r=>r.projectId===p.id&&r.status!=='closed').length]),[''],['OVERDUE ACTIONS'],['Task','Project','Assignee','Due Date','Priority'],...S.tasks.filter(t=>isOverdue(t.dueDate,t.status)).map(t=>[t.title,getProj(t.projectId)?.name||'',t.assignedTo,t.dueDate,t.priority]),[''],['OPEN ESCALATIONS'],['Title','Project','Priority','Raised By','Raised To'],...S.escalations.filter(e=>e.status!=='resolved'&&e.status!=='closed').map(e=>[e.title,getProj(e.projectId)?.name||'',e.priority,e.raisedBy,e.raisedTo])];
+  XLSX.utils.book_append_sheet(wb,xlsxSheet(data),'Weekly Report');
+  xlsxDownload(wb,'Weekly_PMO_Status'); toast('Weekly report exported');
+};
+
+window.exportAllMOM = function() {
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Meeting','Project','Date','Attendees','Discussion','Decisions','Blockers','Action Items'],...S.meetings.map(m=>[m.title,getProj(m.projectId)?.name||'',m.date,(m.attendees||[]).join('; '),(m.discussionPoints||[]).join('; '),(m.decisions||[]).join('; '),(m.blockers||[]).join('; '),(m.actionItems||[]).map(a=>`${a.assignedTo}: ${a.title}`).join('; ')])]),'All Meetings');
+  xlsxDownload(wb,'All_Meetings_MOM'); toast('All MOMs exported');
+};
+
+window.exportRisks = function() {
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Title','Project','Severity','Status','Impact','Mitigation','Owner','Date'],...S.risks.map(r=>[r.title,getProj(r.projectId)?.name||'',r.severity,r.status,r.impact,r.mitigation,r.owner,fmtDate(new Date(r.createdAt).toISOString().split('T')[0])])]),'Risk Register');
+  xlsxDownload(wb,'Risk_Register'); toast('Risk register exported');
+};
+
+window.exportTasks = function() {
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Task','Project','Assignee','Priority','Status','Due Date','Description'],...S.tasks.map(t=>[t.title,getProj(t.projectId)?.name||'',t.assignedTo,t.priority,t.status,t.dueDate,t.description])]),'Action Items');
+  xlsxDownload(wb,'Action_Items'); toast('Tasks exported');
+};
+
+window.exportResources = function() {
+  const wb=XLSX.utils.book_new();
+  const wl={};S.tasks.filter(t=>t.status!=='done').forEach(t=>{wl[t.assignedTo]=(wl[t.assignedTo]||0)+1;});
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Name','Designation','Department','Role','Pending Tasks','Overdue','Email'],...S.people.map(p=>[p.name,p.designation,p.department,p.role,wl[p.name]||0,S.tasks.filter(t=>t.assignedTo===p.name&&isOverdue(t.dueDate,t.status)).length,p.email])]),'Resources');
+  xlsxDownload(wb,'Resource_Allocation'); toast('Resource report exported');
+};
+
+window.exportEscalations = function() {
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Title','Project','Priority','Status','Raised By','Raised To','Description','Resolution'],...S.escalations.map(e=>[e.title,getProj(e.projectId)?.name||'',e.priority,e.status,e.raisedBy,e.raisedTo,e.description,e.resolution])]),'Escalations');
+  xlsxDownload(wb,'Escalations_Report'); toast('Escalations exported');
+};
+
+window.exportDecisions = function() {
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,xlsxSheet([['Decision','Project','Rationale','Made By','Date','Impact Area'],...S.decisions.map(d=>[d.title,getProj(d.projectId)?.name||'',d.rationale,d.madeBy,fmtDate(d.date),d.impactArea])]),'Decisions');
+  xlsxDownload(wb,'Decisions_Log'); toast('Decisions exported');
+};
+
+window.exportBackup = async function() {
+  const backup={projects:S.projects,people:S.people,meetings:S.meetings,tasks:S.tasks,notes:S.notes,risks:S.risks,escalations:S.escalations,decisions:S.decisions,activityLog:S.activityLog,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`PMO_Backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
+  toast('Backup downloaded');
+};
+
+window.restoreBackup = async function(input) {
+  const file=input.files[0]; if(!file) return;
+  try {
+    const text=await file.text(); const data=JSON.parse(text);
+    if(data.projects) await Promise.all(data.projects.map(p=>db.projects.put(p)));
+    if(data.people) await Promise.all(data.people.map(p=>db.people.put(p)));
+    if(data.meetings) await Promise.all(data.meetings.map(m=>db.meetings.put(m)));
+    if(data.tasks) await Promise.all(data.tasks.map(t=>db.tasks.put(t)));
+    if(data.notes) await Promise.all(data.notes.map(n=>db.notes.put(n)));
+    if(data.risks) await Promise.all(data.risks.map(r=>db.risks.put(r)));
+    if(data.escalations) await Promise.all(data.escalations.map(e=>db.escalations.put(e)));
+    if(data.decisions) await Promise.all(data.decisions.map(d=>db.decisions.put(d)));
+    await loadAll(); toast('Backup restored successfully','success'); navigate('dashboard');
+  } catch(e) { toast('Restore failed — invalid file','error'); }
+};
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function toast(msg, type='info') {
+  const t=document.createElement('div');
+  const icons={success:'✓',error:'✕',info:'·'};
+  t.className=`toast toast-${type}`;
+  t.innerHTML=`<span>${icons[type]||'·'}</span> ${msg}`;
+  el('toast-root').appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+// ─── KEYBOARD ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='N'){e.preventDefault();openQuickCapture();}
+  if(e.key==='Escape'){closeModal();}
+});
+
+// ─── NAV CLICKS ───────────────────────────────────────────────────────────────
+$$('.nav-item').forEach(ni=>ni.addEventListener('click',()=>navigate(ni.dataset.page)));
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+(async function init() {
+  await seed();
+  await loadAll();
+  navigate('dashboard');
+})();
+</script>
+</body>
+</html>
